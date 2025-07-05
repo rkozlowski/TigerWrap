@@ -1,0 +1,40 @@
+﻿
+CREATE FUNCTION [Internal].[GetCaseName]
+(	
+	@caseId TINYINT,
+	@name NVARCHAR(200),
+	@schema NVARCHAR(200)
+)
+RETURNS NVARCHAR(500)
+AS
+BEGIN
+	
+	DECLARE @result NVARCHAR(500) = '';
+
+	DECLARE @C_PASCAL_CASE TINYINT = 1;
+	DECLARE @C_CAMEL_CASE TINYINT = 2;
+	DECLARE @C_SNAKE_CASE TINYINT = 3;
+	DECLARE @C_UNDERSCORE_CAMEL_CASE TINYINT = 4;
+	DECLARE @C_UPPER_SNAKE_CASE TINYINT = 5;
+
+	IF LTRIM(ISNULL(@schema, '')) NOT IN (N'dbo', N'sys', N'')
+	BEGIN
+		SET @name = @schema + N'.' + @name;
+	END
+
+	DECLARE @pfx NVARCHAR(1) = CASE WHEN @caseId=@C_UNDERSCORE_CAMEL_CASE THEN N'_' ELSE N'' END;
+	DECLARE @sep NVARCHAR(1) = CASE WHEN @caseId IN (@C_SNAKE_CASE, @C_UPPER_SNAKE_CASE) THEN N'_' ELSE N'' END;
+
+	SELECT @result=@pfx+STRING_AGG(
+		CASE 
+		WHEN @caseId=@C_PASCAL_CASE OR ([ItemNumber]>1 AND @caseId IN (@C_CAMEL_CASE, @C_UNDERSCORE_CAMEL_CASE)) 
+			THEN UPPER(LEFT([Item], 1)) + LOWER(RIGHT([Item], LEN([Item]) - 1)) 
+		WHEN @caseId IN (@C_SNAKE_CASE, @C_CAMEL_CASE, @C_UNDERSCORE_CAMEL_CASE) THEN LOWER([Item])
+		ELSE Upper([Item])
+		END
+		, @sep
+	) WITHIN GROUP (ORDER BY [ItemNumber] ASC)	
+	FROM [Internal].[SplitName](@name);
+	
+	RETURN @result;
+END

@@ -1,0 +1,267 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003" ToolsVersion="4.0">
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <Name>TigerWrapDb</Name>
+    <SchemaVersion>2.0</SchemaVersion>
+    <ProjectVersion>4.1</ProjectVersion>
+    <ProjectGuid>{8573a88a-1414-4839-a742-22191c61ab92}</ProjectGuid>
+    <DSP>Microsoft.Data.Tools.Schema.Sql.Sql150DatabaseSchemaProvider</DSP>
+    <OutputType>Database</OutputType>
+    <RootPath>
+    </RootPath>
+    <RootNamespace>TigerWrapDb</RootNamespace>
+    <AssemblyName>TigerWrapDb</AssemblyName>
+    <ModelCollation>1033,CI</ModelCollation>
+    <DefaultFileStructure>BySchemaType</DefaultFileStructure>
+    <DeployToDatabase>True</DeployToDatabase>
+    <TargetFrameworkVersion>v4.7.2</TargetFrameworkVersion>
+    <TargetLanguage>CS</TargetLanguage>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <SqlServerVerification>False</SqlServerVerification>
+    <IncludeCompositeObjects>True</IncludeCompositeObjects>
+    <TargetDatabaseSet>True</TargetDatabaseSet>
+    <IncludeSchemaNameInFileName>True</IncludeSchemaNameInFileName>
+    <GenerateCreateScript>True</GenerateCreateScript>
+    <DefaultCollation>Latin1_General_CI_AS</DefaultCollation>
+    <ReadCommittedSnapshot>True</ReadCommittedSnapshot>
+    <DefaultFilegroup>PRIMARY</DefaultFilegroup>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <OutputPath>bin\Release\</OutputPath>
+    <BuildScriptName>$(MSBuildProjectName).sql</BuildScriptName>
+    <TreatWarningsAsErrors>False</TreatWarningsAsErrors>
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <DefineDebug>false</DefineDebug>
+    <DefineTrace>true</DefineTrace>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <OutputPath>bin\Debug\</OutputPath>
+    <BuildScriptName>$(MSBuildProjectName).sql</BuildScriptName>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <DefineDebug>true</DefineDebug>
+    <DefineTrace>true</DefineTrace>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+    <SuppressTSqlWarnings>
+    </SuppressTSqlWarnings>
+  </PropertyGroup>
+  <PropertyGroup>
+    <VisualStudioVersion Condition="'$(VisualStudioVersion)' == ''">11.0</VisualStudioVersion>
+    <!-- Default to the v11.0 targets path if the targets file for the current VS version is not found -->
+    <SSDTExists Condition="Exists('$(MSBuildExtensionsPath)\Microsoft\VisualStudio\v$(VisualStudioVersion)\SSDT\Microsoft.Data.Tools.Schema.SqlTasks.targets')">True</SSDTExists>
+    <VisualStudioVersion Condition="'$(SSDTExists)' == ''">11.0</VisualStudioVersion>
+  </PropertyGroup>
+  <Import Condition="'$(SQLDBExtensionsRefPath)' != ''" Project="$(SQLDBExtensionsRefPath)\Microsoft.Data.Tools.Schema.SqlTasks.targets" />
+  <Import Condition="'$(SQLDBExtensionsRefPath)' == ''" Project="$(MSBuildExtensionsPath)\Microsoft\VisualStudio\v$(VisualStudioVersion)\SSDT\Microsoft.Data.Tools.Schema.SqlTasks.targets" />
+  <ItemGroup>
+    <Folder Include="Properties" />
+    <Folder Include="Tables\" />
+    <Folder Include="Functions\" />
+    <Folder Include="Stored Procedures\" />
+    <Folder Include="User Defined Types\" />
+    <Folder Include="Security\" />
+    <Folder Include="Scripts" />
+    <Folder Include="DeploymentScripts" />
+    <Folder Include="Views\" />
+    <Folder Include="Sequences\" />
+  </ItemGroup>
+  <ItemGroup>
+    <Build Include="Functions\dbo.DelimitedSplitN4K.sql" />
+    <Build Include="Tables\dbo.Project.sql" />
+    <Build Include="Tables\dbo.ErrorLog.sql" />
+    <Build Include="Tables\Enum.TemplateType.sql" />
+    <Build Include="Tables\Enum.Language.sql" />
+    <Build Include="Tables\Enum.ClassAccess.sql" />
+    <Build Include="Tables\Enum.Casing.sql" />
+    <Build Include="Tables\Enum.ParamEnumMapping.sql" />
+    <Build Include="Functions\Internal.GetName.sql" />
+    <Build Include="Functions\Internal.GetTemplate.sql" />
+    <Build Include="Functions\Internal.GetLanguageOptions.sql" />
+    <Build Include="Functions\Internal.GetCaseName.sql" />
+    <Build Include="Functions\Internal.RemoveFromEnd.sql" />
+    <Build Include="Functions\Internal.RemoveFromStart.sql" />
+    <Build Include="Functions\Internal.ProcessTemplate.sql" />
+    <Build Include="Functions\Internal.SplitName.sql" />
+    <Build Include="Stored Procedures\Project.GenerateCode.sql" />
+    <Build Include="Stored Procedures\Project.CreateProject.sql" />
+    <Build Include="Stored Procedures\Internal.GenerateEndCode.sql">
+      <SuppressTSqlWarnings>71502</SuppressTSqlWarnings>
+    </Build>
+    <Build Include="Stored Procedures\Internal.GenerateStartCode.sql">
+      <SuppressTSqlWarnings>71502</SuppressTSqlWarnings>
+    </Build>
+    <Build Include="Stored Procedures\Internal.GetEnumValues.sql">
+      <SuppressTSqlWarnings>71502</SuppressTSqlWarnings>
+    </Build>
+    <Build Include="Stored Procedures\Internal.GetEnums.sql">
+      <SuppressTSqlWarnings>71502</SuppressTSqlWarnings>
+    </Build>
+    <Build Include="Stored Procedures\Internal.GenerateTableTypeCode.sql">
+      <SuppressTSqlWarnings>71502</SuppressTSqlWarnings>
+    </Build>
+    <Build Include="Stored Procedures\Internal.GetTableTypeColumns.sql">
+      <SuppressTSqlWarnings>71502</SuppressTSqlWarnings>
+    </Build>
+    <Build Include="Stored Procedures\Internal.LogError.sql" />
+    <Build Include="Stored Procedures\Internal.PrintError.sql" />
+    <Build Include="Stored Procedures\Internal.GenerateStoredProcWrapperCode.sql">
+      <SuppressTSqlWarnings>71502</SuppressTSqlWarnings>
+    </Build>
+    <Build Include="Stored Procedures\Internal.GenerateResultTypeCode.sql">
+      <SuppressTSqlWarnings>71502</SuppressTSqlWarnings>
+    </Build>
+    <Build Include="Stored Procedures\Internal.GetEnumForeignKeys.sql">
+      <SuppressTSqlWarnings>71502</SuppressTSqlWarnings>
+    </Build>
+    <Build Include="Stored Procedures\Internal.GetStoredProcResultSet.sql">
+      <SuppressTSqlWarnings>71502</SuppressTSqlWarnings>
+    </Build>
+    <Build Include="Stored Procedures\Internal.GetStoredProcParams.sql">
+      <SuppressTSqlWarnings>71502</SuppressTSqlWarnings>
+    </Build>
+    <Build Include="Stored Procedures\Internal.GetStoredProcedures.sql">
+      <SuppressTSqlWarnings>71502</SuppressTSqlWarnings>
+    </Build>
+    <Build Include="Stored Procedures\Internal.GenerateEnumCode.sql">
+      <SuppressTSqlWarnings>71502</SuppressTSqlWarnings>
+    </Build>
+    <Build Include="User Defined Types\Internal.Variable.sql" />
+    <Build Include="User Defined Types\Internal.EnumValue.sql" />
+    <Build Include="User Defined Types\Internal.Enum.sql" />
+    <Build Include="Security\Project.sql" />
+    <Build Include="Security\Internal.sql" />
+    <Build Include="Security\Enum.sql" />
+    <Build Include="Tables\Enum.NameType.sql" />
+    <Build Include="Functions\Internal.EscapeString.sql" />
+    <Build Include="Security\Flag.sql" />
+    <Build Include="Functions\Internal.GetLanguageOptionsString.sql" />
+    <Build Include="Stored Procedures\Project.UpdateProject.sql" />
+    <Build Include="Views\View.Project.sql" />
+    <Build Include="Security\View.sql" />
+    <Build Include="Functions\DbInfo.GetName.sql" />
+    <Build Include="Functions\DbInfo.GetCurrentVersion.sql" />
+    <Build Include="Security\DbInfo.sql" />
+    <Build Include="Tables\ParserEnum.TSqlStatementType.sql" />
+    <Build Include="Tables\ParserEnum.TSqlStatementPart.sql" />
+    <Build Include="Tables\ParserEnum.TSqlSequenceType.sql" />
+    <Build Include="Tables\ParserEnum.TSqlSeqElementType.sql" />
+    <Build Include="Tables\ParserEnum.TSqlKeyword.sql" />
+    <Build Include="Tables\ParserEnum.TSqlBlockType.sql" />
+    <Build Include="Tables\ParserEnum.TokenType.sql" />
+    <Build Include="Tables\ParserEnum.TokenSubtype.sql" />
+    <Build Include="Tables\ParserEnum.CharType.sql" />
+    <Build Include="Tables\Parser.Operator.sql" />
+    <Build Include="Tables\Parser.TSqlSeqElement.sql" />
+    <Build Include="Tables\Parser.CharTypeMap.sql" />
+    <Build Include="Tables\Parser.TSqlSequence.sql" />
+    <Build Include="Functions\Parser.IsWhitespace.sql" />
+    <Build Include="Functions\Parser.IsSpecial.sql" />
+    <Build Include="Functions\Parser.IsSeparator.sql" />
+    <Build Include="Functions\Parser.IsOperator.sql" />
+    <Build Include="Functions\Parser.IsLetter.sql" />
+    <Build Include="Functions\Parser.IsDigit.sql" />
+    <Build Include="Functions\Parser.IsDelimiter.sql" />
+    <Build Include="Functions\Parser.GetSequenceLength.sql" />
+    <Build Include="Functions\Parser.GetFullText.sql" />
+    <Build Include="Functions\Parser.GetCharType.sql" />
+    <Build Include="Functions\Parser.FindEndDelimiter.sql" />
+    <Build Include="Stored Procedures\Parser.TryDescribeFirstResultSetWorkaround.sql">
+      <SuppressTSqlWarnings>71502</SuppressTSqlWarnings>
+    </Build>
+    <Build Include="Stored Procedures\Parser.TryParseSequence.sql">
+      <SuppressTSqlWarnings>71502</SuppressTSqlWarnings>
+    </Build>
+    <Build Include="Stored Procedures\Parser.TokenizeTSql.sql">
+      <SuppressTSqlWarnings>71502</SuppressTSqlWarnings>
+    </Build>
+    <Build Include="Stored Procedures\Parser.ParseTSql.sql">
+      <SuppressTSqlWarnings>71502</SuppressTSqlWarnings>
+    </Build>
+    <Build Include="Stored Procedures\Parser.GetSeqElemIdRange.sql" />
+    <Build Include="Security\ParserEnum.sql" />
+    <Build Include="Security\Parser.sql" />
+    <Build Include="Sequences\Parser.TSqlSeqEl.sql" />
+    <Build Include="Tables\Enum.NameMatch.sql" />
+    <Build Include="Tables\dbo.ProjectStoredProc.sql" />
+    <Build Include="Tables\dbo.ProjectEnum.sql" />
+    <Build Include="Functions\Internal.IsNameMatch.sql" />
+    <Build Include="Tables\Enum.NameSource.sql" />
+    <Build Include="Tables\Enum.NamePartType.sql" />
+    <Build Include="Tables\dbo.ProjectNameNormalization.sql" />
+    <Build Include="Functions\Internal.GetNameEx.sql" />
+    <Build Include="Tables\Enum.ToolkitResponseCode.sql" />
+    <Build Include="Stored Procedures\Internal.CreateProject.sql" />
+    <Build Include="Stored Procedures\Toolkit.GetProjectId.sql" />
+    <Build Include="Stored Procedures\Toolkit.GetAllProjects.sql" />
+    <Build Include="Stored Procedures\Toolkit.CreateProject.sql" />
+    <Build Include="Stored Procedures\Toolkit.GetResponseCodes.sql" />
+    <Build Include="Security\Toolkit.sql" />
+    <Build Include="Tables\dbo.SchemaVersion.sql" />
+    <Build Include="Tables\Enum.Status.sql" />
+    <Build Include="Tables\Enum.LoggingLevel.sql" />
+    <Build Include="Tables\Enum.CodePart.sql" />
+    <Build Include="Stored Procedures\Toolkit.GetProjects.sql" />
+    <Build Include="Stored Procedures\Toolkit.GetProjectInfo.sql" />
+    <Build Include="Stored Procedures\Toolkit.GetLanguages.sql" />
+    <Build Include="Stored Procedures\Toolkit.GetDbInfo.sql" />
+    <Build Include="Stored Procedures\Toolkit.GenerateCode.sql" />
+    <Build Include="Stored Procedures\Internal.GenerateCode.sql" />
+    <None Include="Scripts\Script.LanguageOptionsGen.sql" />
+    <Build Include="Stored Procedures\Toolkit.UpdateProject.sql" />
+    <Build Include="Stored Procedures\Toolkit.RemoveProjectStoredProcMapping.sql" />
+    <Build Include="Stored Procedures\Toolkit.RemoveProjectNameNormalization.sql" />
+    <Build Include="Stored Procedures\Toolkit.RemoveProjectEnumMapping.sql" />
+    <Build Include="Stored Procedures\Toolkit.GetProjectStoredProcedureMappings.sql" />
+    <Build Include="Stored Procedures\Toolkit.GetProjectNameNormalizations.sql" />
+    <Build Include="Stored Procedures\Toolkit.GetProjectEnumMappings.sql" />
+    <Build Include="Stored Procedures\Toolkit.GetProjectDetails.sql" />
+    <Build Include="Stored Procedures\Toolkit.GetProjectDbSchemas.sql" />
+    <Build Include="Stored Procedures\Toolkit.GetProjectDbSchemaProcs.sql" />
+    <Build Include="Stored Procedures\Toolkit.GetProjectDbSchemaEnumCandidates.sql" />
+    <Build Include="Stored Procedures\Toolkit.GetLanguageOptions.sql" />
+    <Build Include="Stored Procedures\Toolkit.AddProjectStoredProcMapping.sql" />
+    <Build Include="Stored Procedures\Toolkit.AddProjectNameNormalization.sql" />
+    <Build Include="Stored Procedures\Toolkit.AddProjectEnumMapping.sql" />
+    <Build Include="Tables\Static.LanguageNameCasing.sql" />
+    <Build Include="Tables\Static.DataTypeMap.sql" />
+    <Build Include="Tables\Static.LanguageOption.sql" />
+    <Build Include="Tables\Static.Template.sql" />
+    <Build Include="Tables\Static.Number.sql" />
+    <Build Include="Security\Static.sql" />
+  </ItemGroup>
+  <ItemGroup>
+    <PostDeploy Include="Scripts\Script.PostDeployment.sql" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Scripts\Script.StaticDataInsertsGen.sql" />
+    <None Include="Scripts\Script.StaticDataInserts.sql" />
+    <None Include="Scripts\Script.Templates.sql" />
+    <None Include="Scripts\Script.Version.sql" />
+    <None Include="TigerWrapDb.FullDeploy.publish.xml" />
+    <None Include="TigerWrapDb.Upgrade.publish.xml" />
+    <None Include="Scripts\Script.LanguageOptions.sql" />
+    <None Include="Scripts\Script.Parser.StaticDataInsertsGen.sql" />
+    <None Include="Scripts\Script.Parser.DataInit.sql" />
+    <None Include="Scripts\Script.Parser.StaticDataInserts.sql" />
+    <None Include="Scripts\Script.Parser.Data.sql" />
+    <None Include="Scripts\Script.PreUpgradeVersionCheck.sql" />
+  </ItemGroup>
+  <ItemGroup>
+    <PreDeploy Include="Scripts\Script.PreDeployment.sql" />
+  </ItemGroup>
+  <ItemGroup>
+    <ArtifactReference Include="$(DacPacRootPath)\Extensions\Microsoft\SQLDB\Extensions\SqlServer\150\SqlSchemas\master.dacpac">
+      <HintPath>$(DacPacRootPath)\Extensions\Microsoft\SQLDB\Extensions\SqlServer\150\SqlSchemas\master.dacpac</HintPath>
+      <SuppressMissingDependenciesErrors>True</SuppressMissingDependenciesErrors>
+      <DatabaseVariableLiteralValue>master</DatabaseVariableLiteralValue>
+    </ArtifactReference>
+  </ItemGroup>
+</Project>

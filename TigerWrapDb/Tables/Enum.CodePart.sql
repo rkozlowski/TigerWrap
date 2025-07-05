@@ -1,0 +1,9 @@
+﻿CREATE TABLE [Enum].[CodePart] (
+    [Id]   TINYINT      NOT NULL,
+    [Name] VARCHAR (50) NOT NULL,
+    [Code] CHAR (1)     NOT NULL,
+    CONSTRAINT [PK_CodePart] PRIMARY KEY CLUSTERED ([Id] ASC),
+    CONSTRAINT [UQ_CodePart_Code] UNIQUE NONCLUSTERED ([Code] ASC),
+    CONSTRAINT [UQ_CodePart_Name] UNIQUE NONCLUSTERED ([Name] ASC)
+);
+
