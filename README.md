@@ -5,6 +5,7 @@
   &nbsp;&nbsp;&nbsp;&nbsp;
   <img src="https://raw.githubusercontent.com/rkozlowski/TigerWrap/main/docs/assets/TigerWrap256.png" alt="TigerWrap Icon" width="100" />
 </p>
+
 # 🐅 TigerWrap
 
 **TigerWrap** is a schema-first code generator for SQL Server. It creates clean, strongly-typed C# wrappers for your stored procedures and enums — no ORM required.
