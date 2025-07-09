@@ -8,6 +8,21 @@ Designed for developers who want to keep their SQL logic in the database and cal
 
 ---
 
+## ⚠️ Use With Care
+
+**TigerWrap is a power tool**.
+Like any power tool, it gives you precision, speed, and control — but if you use it carelessly, you can hurt yourself.
+
+TigerWrap does **not** abstract away SQL. It doesn’t try to “save” you from poor design, long-running transactions, or mismatched assumptions between layers. Instead, it assumes:
+
+- You **know your schema**.
+- You **respect your stored procedures**.
+- You **want clean separation** between your data logic and your application code.
+
+> **Used wisely**, TigerWrap gives you exactly what you ask for — no more, no less.
+
+---
+
 ## ✨ Features
 
 - ✅ Stored procedure wrappers with input/output/return handling  
