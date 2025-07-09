@@ -20,6 +20,8 @@ public class ConnectionService
 
         Directory.CreateDirectory(folder);
         _configPath = Path.Combine(folder, "connections.json");
+        var logDir = Path.Combine(folder, "logs");
+        Directory.CreateDirectory(logDir);
     }
 
     public List<ConnectionInfo> LoadConnections()

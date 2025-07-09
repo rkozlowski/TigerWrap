@@ -17,6 +17,7 @@ class Program
 {
     public static int Main(string[] args)
     {
+        //var logger = LogManager.Setup().LoadConfigurationFromFile("NLog.config").GetCurrentClassLogger();
         // Setup DI & Spectre
         var services = new ServiceCollection();
         
@@ -24,7 +25,7 @@ class Program
         {
             logging.ClearProviders();
             logging.SetMinimumLevel(Microsoft.Extensions.Logging.LogLevel.Debug);
-            logging.AddNLog(); // if using NLog
+            logging.AddNLog();
         });
 
         services.AddSingleton<ConnectionService>();
@@ -35,7 +36,7 @@ class Program
 
         app.Configure(config =>
         {
-            config.SetApplicationName("mssql-helper");
+            config.SetApplicationName("tiger-wrap");
 
             config.AddBranch("connections", connections =>
             {
@@ -49,6 +50,7 @@ class Program
                 projects.AddCommand<ProjectsListCommand>("list");
                 projects.AddCommand<ProjectsShowCommand>("show");
                 projects.AddCommand<ProjectsAddCommand>("add");
+                projects.AddCommand<ProjectsUpdateCommand>("update");                
                 projects.AddBranch("sp", sp =>
                 {
                     sp.AddCommand<ProjectsSpAddCommand>("add");
@@ -69,6 +71,8 @@ class Program
             config.AddCommand<LanguagesListCommand>("languages-list");
             config.AddCommand<VersionCommand>("version");
             config.ValidateExamples();
+
+            config.SetHelpProvider(new TigerWrapHelpProvider(config.Settings));
         });
 
         return app.Run(args);

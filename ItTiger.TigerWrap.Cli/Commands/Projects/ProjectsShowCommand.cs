@@ -38,19 +38,19 @@ public sealed class ProjectsShowCommand(ConnectionService _connectionService, IL
 
         var (optHex, optNames) = await ToolkitHelper.GetLanguageOptionsSummaryAsync(db, languageId, options);
 
-        AnsiConsole.MarkupLine($"[bold green]Project Details: {s.ProjectName}[/]");
+        AnsiConsole.MarkupLine($"[bold green]Project Details: {Markup.Escape(s.ProjectName)}[/]");
         var details = new Table().RoundedBorder()
             .AddColumn("Property").AddColumn("Value")
-            .AddRow("Project Name", $"[aqua]{s.ProjectName}[/]")
-            .AddRow("Class", className)
-            .AddRow("Namespace", ns)
-            .AddRow("LanguageId", languageId?.ToString() ?? "")
-            .AddRow("Default DB", defaultDb)
-            .AddRow("Class Access", classAccess?.ToString() ?? "")
-            .AddRow("Enum Mapping", enumMapping?.ToString() ?? "")
+            .AddRow("Project Name", $"[aqua]{Markup.Escape(s.ProjectName)}[/]")
+            .AddRow("Class", Markup.Escape(className))
+            .AddRow("Namespace", Markup.Escape(ns))
+            .AddRow("LanguageId", Markup.Escape(languageId?.ToString() ?? ""))
+            .AddRow("Default DB", Markup.Escape(defaultDb))
+            .AddRow("Class Access", Markup.Escape(classAccess?.ToString() ?? ""))
+            .AddRow("Enum Mapping", Markup.Escape(enumMapping?.ToString() ?? ""))
             .AddRow("Map Enums in Result Sets", mapEnums.HasValue ? (mapEnums.Value ? "Yes" : "No") : "")
             .AddRow("Options", optHex)
-            .AddRow("", optNames);
+            .AddRow("", Markup.Escape(optNames));
 
         AnsiConsole.Write(details);
 
@@ -65,8 +65,8 @@ public sealed class ProjectsShowCommand(ConnectionService _connectionService, IL
             {
                 table.AddRow(
                     r.Id.ToString(), r.Schema, r.NameMatchId.ToString(),
-                    r.NamePattern ?? "", r.EscChar ?? "", r.IsSetOfFlags.ToString(),
-                    r.NameColumn ?? "");
+                    Markup.Escape(r.NamePattern ?? ""), Markup.Escape(r.EscChar ?? ""), r.IsSetOfFlags.ToString(),
+                    Markup.Escape(r.NameColumn ?? ""));
             }
 
             AnsiConsole.Write(table);
@@ -84,10 +84,10 @@ public sealed class ProjectsShowCommand(ConnectionService _connectionService, IL
                 var (rsHex, rsNames) = await ToolkitHelper.GetLanguageOptionsSummaryAsync(db, languageId, r.LanguageOptionsReset);
                 var (setHex, setNames) = await ToolkitHelper.GetLanguageOptionsSummaryAsync(db, languageId, r.LanguageOptionsSet);
                 table.AddRow(
-                    r.Id.ToString(), r.Schema, r.NameMatchId.ToString(),
-                    r.NamePattern ?? "", r.EscChar ?? "",
+                    r.Id.ToString(), Markup.Escape(r.Schema), Markup.Escape(r.NameMatchId.ToString()),
+                    Markup.Escape(r.NamePattern ?? ""), Markup.Escape(r.EscChar ?? ""),
                     rsHex, setHex);
-                table.AddRow("", "", "", "", "", rsNames, setNames);
+                table.AddRow("", "", "", "", "", Markup.Escape(rsNames), Markup.Escape(setNames));
             }
 
             AnsiConsole.Write(table);
@@ -103,8 +103,8 @@ public sealed class ProjectsShowCommand(ConnectionService _connectionService, IL
             {
                 table.AddRow(
                     r.Id.ToString(),
-                    r.NamePart ?? "",
-                    r.NamePartTypeId.ToString());
+                    Markup.Escape(r.NamePart ?? ""),
+                    Markup.Escape(r.NamePartTypeId.ToString()));
             }
 
             AnsiConsole.Write(table);

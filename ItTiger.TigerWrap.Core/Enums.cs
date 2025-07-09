@@ -10,8 +10,8 @@ public enum AuthenticationType
     [Description("Use SQL Username and Password")]
     SqlPassword,
 
-    [Description("Use Entra ID (future)")]
-    Entra
+    //[Description("Use Entra ID (future)")]
+    //Entra
 }
 
 public enum EncryptOption
@@ -29,7 +29,7 @@ public enum PasswordEncryptionType
 {
     NotApplicable, // e.g. Integrated auth
     DPAPI,         // Local machine/user
-    Vault          // Cloud key vault in future
+    //Vault          // Cloud key vault in future
 }
 
 public enum OutputType

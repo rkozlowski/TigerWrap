@@ -91,10 +91,10 @@ public sealed class ProjectsListCommand(ConnectionService _connectionService, IL
             {
                 table.AddRow(
                     proj.Id.ToString(),
-                    proj.Name,
-                    proj.ClassName,
-                    proj.NamespaceName,
-                    proj.LanguageName);
+                    Markup.Escape(proj.Name),
+                    Markup.Escape(proj.ClassName),
+                    Markup.Escape(proj.NamespaceName),
+                    Markup.Escape(proj.LanguageName));
             }
 
             AnsiConsole.Write(table);

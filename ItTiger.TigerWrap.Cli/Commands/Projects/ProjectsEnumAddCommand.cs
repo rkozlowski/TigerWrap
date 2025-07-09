@@ -50,7 +50,7 @@ public sealed class ProjectsEnumAddCommand(ConnectionService _connectionService,
         {
             if (!NameMatch.HasValue || !Enum.IsDefined(typeof(NameMatch), NameMatch.Value))
                 return ValidationResult.Error($"Invalid name match. Valid values: {ToolkitHelper.GetEnumValuesDescription<NameMatch>()}");
-
+    
             return base.Validate();
         }
     }

@@ -80,7 +80,7 @@ public class ConnectionsUpdateCommand(ConnectionService _service, ILogger<Connec
         }
 
         _service.AddOrUpdateConnection(conn);
-        AnsiConsole.MarkupLine($"[green]Connection '{conn.Name}' updated![/]");
+        AnsiConsole.MarkupLine($"[green]Connection '{Markup.Escape(conn.Name)}' updated![/]");
         _logger.LogInformation("Updated connection: {Name}", conn.Name);
         return 0;
     }

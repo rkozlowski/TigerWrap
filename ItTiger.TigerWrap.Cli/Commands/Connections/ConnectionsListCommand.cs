@@ -31,7 +31,7 @@ public class ConnectionsListCommand(ConnectionService _service, ILogger<Connecti
 
         foreach (var c in connections)
         {
-            table.AddRow(c.Name, c.Server, c.Database);
+            table.AddRow(Markup.Escape(c.Name), Markup.Escape(c.Server), Markup.Escape(c.Database));
         }
 
         AnsiConsole.Write(table);

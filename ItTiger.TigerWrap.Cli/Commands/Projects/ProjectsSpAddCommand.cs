@@ -78,7 +78,7 @@ public sealed class ProjectsSpAddCommand(ConnectionService _connectionService, I
         var (rc, projectId, languageId, _, _, _) = await db.GetProjectInfoAsync(s.ProjectName);
         if (rc != 0 || projectId is null)
         {
-            return CliHelper.Fail((ToolkitResponseCode)rc, $"Could not find project: {s.ProjectName}", _logger);
+            return CliHelper.Fail((ToolkitResponseCode)rc, $"Could not find project: {Markup.Escape(s.ProjectName)}", _logger);
         }
 
         if (string.IsNullOrWhiteSpace(s.Schema) && !s.NonInteractive)

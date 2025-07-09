@@ -8,11 +8,12 @@ using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Logging;
 using System.ComponentModel;
 using static ItTiger.TigerWrap.Core.ToolkitDbHelper;
+using System.Threading.Tasks;
 
 namespace ItTiger.TigerWrap.Cli.Commands.Connections;
 
 public class ConnectionsAddCommand(ConnectionService service, ILogger<ConnectionsAddCommand> logger)
-    : Command<ConnectionsAddCommand.Settings>
+    : AsyncCommand<ConnectionsAddCommand.Settings>
 {
     private readonly ConnectionService _service = service;
     private readonly ILogger _logger = logger;
@@ -26,8 +27,8 @@ public class ConnectionsAddCommand(ConnectionService service, ILogger<Connection
         public string Server { get; set; } = string.Empty;
 
         [CommandOption("--auth <AUTH>")]
-        [Description("Authentication type: Integrated | SqlPassword | Entra")]
-        public AuthenticationType Authentication { get; set; }
+        [Description("Authentication type: Integrated | SqlPassword")]
+        public AuthenticationType Authentication { get; set; } = AuthenticationType.Integrated;
 
         [CommandOption("--username <USERNAME>")]
         public string Username { get; set; } = string.Empty;
@@ -39,11 +40,12 @@ public class ConnectionsAddCommand(ConnectionService service, ILogger<Connection
         [Description("Encryption option: Optional | Mandatory | Strict")]
         public EncryptOption Encrypt { get; set; } = EncryptOption.Optional;
 
-        [CommandOption("--trust-server-cert")]
-        public bool TrustServerCertificate { get; set; } = false;
+        [CommandOption("--trust-server-cert <YesNo>")]
+        [Description("Trust server certificate: Yes | No")]
+        public BoolChoice? TrustServerCertificate { get; set; }
     }
 
-    public override int Execute(CommandContext context, Settings s)
+    public override async Task<int> ExecuteAsync(CommandContext context, Settings s)
     {
         if (string.IsNullOrWhiteSpace(s.Name))
         {
@@ -58,21 +60,23 @@ public class ConnectionsAddCommand(ConnectionService service, ILogger<Connection
             return CliHelper.Fail(ToolkitResponseCode.CliInvalidArguments, "Username is required for SQL authentication.", _logger);
         }
 
-        var existing = _service.LoadConnections().FirstOrDefault(c => c.Name == s.Name);
+        var name = s.Name.Trim();
+
+        var existing = _service.LoadConnections().FirstOrDefault(c => c.Name == name);
         if (existing != null)
         {
-            return CliHelper.Fail(ToolkitResponseCode.CliInvalidArguments, $"A connection named '{s.Name}' already exists. Use 'update' instead.", _logger);
+            return CliHelper.Fail(ToolkitResponseCode.CliInvalidArguments, $"A connection named '{name}' already exists. Use 'update' instead.", _logger);
         }
 
         var info = new ConnectionInfo
         {
-            Name = s.Name.Trim(),
+            Name = name,
             Server = s.Server.Trim(),
             Authentication = s.Authentication,
             Username = s.Username?.Trim() ?? string.Empty,
             Database = s.Database?.Trim() ?? string.Empty,
             Encrypt = s.Encrypt,
-            TrustServerCertificate = s.TrustServerCertificate
+            TrustServerCertificate = s.TrustServerCertificate.AsBool()
         };
 
         if (s.Authentication == AuthenticationType.SqlPassword && string.IsNullOrWhiteSpace(info.PlainPassword))
@@ -82,7 +86,13 @@ public class ConnectionsAddCommand(ConnectionService service, ILogger<Connection
                 return CliHelper.Fail(ToolkitResponseCode.CliInteractiveNotAllowed, "Password is required in non-interactive mode.", _logger);
             }
             info.PlainPassword = AnsiConsole.Prompt(
-                new TextPrompt<string>("Password?").Secret());
+                new TextPrompt<string>("Enter [green]SQL password[/]:").Secret());
+        }
+
+        if (s.TrustServerCertificate is null && !s.NonInteractive)
+        {
+            s.TrustServerCertificate = await CliHelper.AskBoolChoiceAsync("Trust [green]server certificate[/]?");
+            info.TrustServerCertificate = s.TrustServerCertificate.AsBool();
         }
 
         if (string.IsNullOrWhiteSpace(info.Database))
@@ -91,31 +101,13 @@ public class ConnectionsAddCommand(ConnectionService service, ILogger<Connection
             {
                 return CliHelper.Fail(ToolkitResponseCode.CliInteractiveNotAllowed, "Database is required in non-interactive mode.", _logger);
             }
-
-            try
-            {
-                using var sql = new SqlConnection(info.BuildConnectionString());
-                sql.Open();
-                using var cmd = sql.CreateCommand();
-                cmd.CommandText = "SELECT [name] FROM sys.databases WHERE database_id > 4 ORDER BY [name]";
-                using var reader = cmd.ExecuteReader();
-                var dbs = new List<string>();
-                while (reader.Read()) dbs.Add(reader.GetString(0));
-
-                info.Database = AnsiConsole.Prompt(
-                    new SelectionPrompt<string>()
-                        .Title("Select a [green]user database[/]:")
-                        .AddChoices(dbs));
-            }
-            catch (Exception ex)
-            {
-                return CliHelper.Fail(ToolkitResponseCode.CliFileWriteError, $"Could not connect to retrieve databases: {ex.Message}", _logger);
-            }
+            using var sqlConn = new SqlConnection(info.BuildConnectionString());
+            info.Database = await CliHelper.SelectDatabaseAsync(sqlConn, "Select a [green]TigerWrap database[/]:") ?? string.Empty;
         }
 
         _service.AddOrUpdateConnection(info);
-        _logger.LogInformation("Connection added: {Name}", info.Name);
-        AnsiConsole.MarkupLine($"[green]Connection '{info.Name}' saved.[/]");
+        _logger.LogInformation("Connection added: {Name} ({Server}/{Database})", info.Name, info.Server, info.Database);
+        AnsiConsole.MarkupLine($"[green]Connection '{Markup.Escape(info.Name)}' saved.[/]");
         return 0;
     }
 }

@@ -83,8 +83,8 @@ public sealed class GenerateCodeCommand(ConnectionService _connectionService, IL
             var outputDir = string.IsNullOrWhiteSpace(s.OutputFolder) ? Environment.CurrentDirectory : Path.GetFullPath(s.OutputFolder);
             var prefix = s.OutputFilePrefix ?? className;
 
-            AnsiConsole.MarkupLine($"[green]Generating code for project:[/] [bold]{s.ProjectName}[/]");
-            AnsiConsole.MarkupLine($"Class: [yellow]{className}[/], Language: [yellow]{languageId}[/], Database: [yellow]{dbName}[/]");
+            AnsiConsole.MarkupLine($"[green]Generating code for project:[/] [bold]{Markup.Escape(s.ProjectName)}[/]");
+            AnsiConsole.MarkupLine($"Class: [yellow]{Markup.Escape(className)}[/], Language: [yellow]{Markup.Escape(languageId.ToString() ?? "")}[/], Database: [yellow]{Markup.Escape(dbName)}[/]");
 
             var genStopwatch = Stopwatch.StartNew();
             var (results, genRc, genErr) = await db.GenerateCodeAsync(projectId.Value, dbName, s.LoggingLevel);
@@ -107,7 +107,7 @@ public sealed class GenerateCodeCommand(ConnectionService _connectionService, IL
                 var text = string.Join(Environment.NewLine, results.OrderBy(r => r.Id).Select(r => r.Text));
                 await File.WriteAllTextAsync(file, text);
                 _logger.LogInformation("Written to: {File}", file);
-                AnsiConsole.MarkupLine($"[green]Written: [italic]{file}[/][/]");
+                AnsiConsole.MarkupLine($"[green]Written: [italic]{Markup.Escape(file)}[/][/]");
                 AnsiConsole.MarkupLine($"[blue]Code generation time: {genStopwatch.Elapsed.TotalSeconds:F3}s, total: {stopwatch.Elapsed.TotalSeconds:F3}s[/]");
                 return 0;
             }
@@ -140,7 +140,7 @@ public sealed class GenerateCodeCommand(ConnectionService _connectionService, IL
                 lines.AddRange(footers);
 
                 await File.WriteAllTextAsync(file, string.Join(Environment.NewLine, lines));
-                AnsiConsole.MarkupLine($"[green]Written: [italic]{file}[/][/]");
+                AnsiConsole.MarkupLine($"[green]Written: [italic]{Markup.Escape(file)}[/][/]");
             }
 
             if (bootstrap.Count > 0)
@@ -156,7 +156,7 @@ public sealed class GenerateCodeCommand(ConnectionService _connectionService, IL
                 lines.AddRange(bootstrap.Select(b => b.Text));
                 lines.AddRange(footers);
                 await File.WriteAllTextAsync(bootstrapFile, string.Join(Environment.NewLine, lines));
-                AnsiConsole.MarkupLine($"[green]Written: [italic]{bootstrapFile}[/][/]");
+                AnsiConsole.MarkupLine($"[green]Written: [italic]{Markup.Escape(bootstrapFile)}[/][/]");
             }
 
             stopwatch.Stop();
@@ -200,7 +200,7 @@ public sealed class GenerateCodeCommand(ConnectionService _connectionService, IL
             return Task.FromResult<ToolkitResponseCode?>(ToolkitResponseCode.CliInteractiveNotAllowed);
         }
 
-        var overwrite = AnsiConsole.Confirm($"File [italic]{filePath}[/] exists. Overwrite?");
+        var overwrite = AnsiConsole.Confirm($"File [italic]{Markup.Escape(filePath)}[/] exists. Overwrite?");
         return Task.FromResult<ToolkitResponseCode?>(overwrite ? null : ToolkitResponseCode.CliFileWriteError);
     }
 }

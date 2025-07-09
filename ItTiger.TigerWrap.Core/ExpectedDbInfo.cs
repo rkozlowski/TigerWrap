@@ -4,7 +4,7 @@
     {
         public const string DbName = "TigerWrapDb";
 
-        public const byte MinApiLevel = 0;
+        public const byte MinApiLevel = 1;
         public const byte MaxApiLevel = 1; // adjust as you increment it
 
         public static bool IsApiLevelSupported(byte? apiLevel)

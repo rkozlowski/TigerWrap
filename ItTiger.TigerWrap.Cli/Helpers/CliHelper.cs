@@ -1,4 +1,5 @@
 ﻿using ItTiger.TigerWrap.Core;
+using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Logging;
 using Spectre.Console;
 using System.Runtime.InteropServices;
@@ -151,9 +152,9 @@ public static class CliHelper
         {
             var name = value.ToString();
             if (currentValue.HasValue && EqualityComparer<T>.Default.Equals(currentValue.Value, value))
-                choices.Insert(allowNull ? 1 : 0, name); // Move to top after <None> if applicable
+                choices.Insert(allowNull ? 1 : 0, Markup.Escape(name)); // Move to top after <None> if applicable
             else
-                choices.Add(name);
+                choices.Add(Markup.Escape(name));
         }
 
         var selection = new SelectionPrompt<string>()
@@ -172,6 +173,11 @@ public static class CliHelper
         throw new InvalidOperationException($"Unable to parse selected enum value: '{selected}'");
     }
 
+    public static async Task<BoolChoice> AskBoolChoiceAsync(string question, BoolChoice defaultValue = BoolChoice.No)
+    {
+        return await CliHelper.SelectEnumValueAsync<BoolChoice>(question, defaultValue) ?? defaultValue;
+    }
+
     public static async Task<string> SelectSchemaAsync(
     ToolkitDbHelper db,
     short projectId,
@@ -188,6 +194,52 @@ public static class CliHelper
                 .Title(prompt)
                 .AddChoices(choices)
         ).Value;
+    }
+
+    public static async Task<string?> SelectDatabaseAsync(ToolkitDbHelper db, string title, string? currentValue = null)
+    {
+        var sql = new SqlConnection(db.ConnectionString);
+        return await SelectDatabaseAsync(sql, title, currentValue);
+    }
+
+
+    public static async Task<string?> SelectDatabaseAsync(SqlConnection sql, string title, string? currentValue = null)
+    {        
+        await sql.OpenAsync();
+        var cmd = sql.CreateCommand();
+        cmd.CommandText = "SELECT [name] FROM sys.databases WHERE database_id > 4 ORDER BY [name]";
+        using var reader = await cmd.ExecuteReaderAsync();
+
+        var dbs = new List<string>();
+        while (await reader.ReadAsync())
+        {
+            var name = reader.GetString(0);
+            if (!string.IsNullOrEmpty(currentValue) && currentValue == name)
+            {
+                // Spectre.Console does not support pre-selection, so put it first
+                dbs.Insert(0, name);
+            }
+            else
+            {
+                dbs.Add(name);
+            }
+        }
+        if (dbs.Count == 0)
+            return null;
+
+        var choices = dbs.Select(name =>
+        {
+            var label = Markup.Escape(name);
+            return new SelectionItem<string>(name, label);
+        }).ToList();
+
+        var selected = AnsiConsole.Prompt(
+            new SelectionPrompt<SelectionItem<string>>()
+            .Title(title)
+            .AddChoices(choices)
+        );
+
+        return selected.Value;
     }
 
 }

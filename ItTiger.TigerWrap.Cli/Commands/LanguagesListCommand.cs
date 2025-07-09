@@ -45,7 +45,7 @@ public sealed class LanguagesListCommand(ConnectionService _connectionService, I
 
             foreach (var lang in languages)
             {
-                table.AddRow(((int)lang.Id).ToString(), lang.Name, lang.Code);
+                table.AddRow(((int)lang.Id).ToString(), Markup.Escape(lang.Name), Markup.Escape(lang.Code));
             }
 
             AnsiConsole.Write(table);

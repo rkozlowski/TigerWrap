@@ -101,16 +101,7 @@ public sealed class ProjectsAddCommand(ConnectionService _connectionService, ILo
             try
             {
                 using var sql = new SqlConnection(db.ConnectionString);
-                sql.Open();
-                using var cmd = sql.CreateCommand();
-                cmd.CommandText = "SELECT [name] FROM sys.databases WHERE database_id > 4 ORDER BY [name]";
-                using var reader = cmd.ExecuteReader();
-                var dbs = new List<string>();
-                while (reader.Read()) { dbs.Add(reader.GetString(0)); }
-                s.DefaultDatabase = AnsiConsole.Prompt(
-                    new SelectionPrompt<string>()
-                        .Title("Select a [green]user database[/]:")
-                        .AddChoices(dbs));
+                s.DefaultDatabase = await CliHelper.SelectDatabaseAsync(sql, "Select a [green]user database[/]:");                
             }
             catch (Exception ex)
             {
@@ -146,7 +137,7 @@ public sealed class ProjectsAddCommand(ConnectionService _connectionService, ILo
             return CliHelper.Fail((ToolkitResponseCode)rc, err, _logger);
         }
 
-        AnsiConsole.MarkupLine($"[green]Project '{s.ProjectName}' created with ID {projectId}![/]");
+        AnsiConsole.MarkupLine($"[green]Project '{Markup.Escape(s.ProjectName)}' created with ID {projectId}![/]");
         return 0;
     }
 }

@@ -28,7 +28,7 @@ public class ConnectionsDeleteCommand(ConnectionService _service, ILogger<Connec
             );
         }
 
-        AnsiConsole.MarkupLine($"[green]Connection '{settings.Name}' deleted.[/]");
+        AnsiConsole.MarkupLine($"[green]Connection '{Markup.Escape(settings.Name)}' deleted.[/]");
         _logger.LogInformation("Deleted connection: {Name}", settings.Name);
         return 0;
     }

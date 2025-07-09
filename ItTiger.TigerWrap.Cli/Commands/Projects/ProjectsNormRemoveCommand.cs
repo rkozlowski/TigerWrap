@@ -49,7 +49,7 @@ public sealed class ProjectsNormRemoveCommand(ConnectionService _connectionServi
         var (rc, projectId, _, _, _, _) = await db.GetProjectInfoAsync(s.ProjectName);
         if (rc != 0 || projectId is null)
         {
-            return CliHelper.Fail((ToolkitResponseCode)rc, $"Could not find project: {s.ProjectName}", _logger);
+            return CliHelper.Fail((ToolkitResponseCode)rc, $"Could not find project: {Markup.Escape(s.ProjectName)}", _logger);
         }
 
         var normalizationId = s.NormalizationId;
