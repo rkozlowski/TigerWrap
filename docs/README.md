@@ -1,19 +1,12 @@
-<p align="center">
-  <a href="https://www.ittiger.net">
-    <img src="https://raw.githubusercontent.com/rkozlowski/TigerWrap/main/docs/assets/ItTiger-head.png" alt="IT Tiger Logo" width="120" />
-  </a>
-  &nbsp;&nbsp;&nbsp;&nbsp;
-  <img src="https://raw.githubusercontent.com/rkozlowski/TigerWrap/main/docs/assets/TigerWrap256.png" alt="TigerWrap Icon" width="100" />
-</p>
+# TigerWrap
 
-# 🐅 TigerWrap — Documentation Hub
+<img src="https://raw.githubusercontent.com/rkozlowski/TigerWrap/main/docs/assets/TigerWrap256.png" alt="TigerWrap Logo" width="80"/>
 
-Welcome to **TigerWrap**, a schema-first code generator for SQL Server that produces clean, strongly-typed C# wrappers for stored procedures and enum tables.
+**TigerWrap** is a schema-first code generator for SQL Server that produces clean, strongly-typed C# wrappers for stored procedures and enum tables.
 
 This documentation hub provides everything you need to install, configure, and use TigerWrap effectively.
 
 ---
-
 ## 🎯 Purpose and Philosophy
 
 TigerWrap is **not** an ORM.
@@ -21,12 +14,16 @@ TigerWrap is **not** an ORM.
 Instead, it helps you:
 - Treat **stored procedures** as the API surface of your database
 - Define **enum tables** as the single source of truth for shared static data
-- Generate clean, dependency-free C# code to access them
+- Generate clean, minimal-dependency C# code to access them
 
 This promotes:
 - Clear boundaries between application logic and data access
 - Stable, explicit database contracts
 - Testable and maintainable integration
+
+> ⚠️ **Note**: The generated C# code depends on:
+> - [`Dapper`](https://www.nuget.org/packages/Dapper/)
+> - [`Microsoft.Data.SqlClient`](https://www.nuget.org/packages/Microsoft.Data.SqlClient/) (for .NET Core / .NET 6+)
 
 TigerWrap does **not** generate code for:
 - Tables or views
@@ -103,14 +100,28 @@ For more reasoning, see:
 
 ---
 
-## 🛠 Roadmap
+## 🚧 Known Limitations
 
-TigerWrap is currently in **beta** (`v0.9.x`). Planned improvements include:
+TigerWrap is designed to support **common, production-quality patterns** in stored procedure development.  
+However, certain advanced or unusual SQL constructs may not be supported:
 
-- Optional GUI (planned for v0.9.5+)
-- Better test coverage and validation tools
-- Integrated upgrade/installer helpers
-- Extensibility model (post-1.0)
+- Highly dynamic SQL that alters result shape
+- Schemas that break metadata inspection
+- Uncompiled/broken stored procedures
+- Unusual temporary table usage patterns
+
+More details and formal tracking to come in future versions.
+
+---
+
+## ⚖️ License
+
+TigerWrap is licensed under the [MIT License](../LICENSE).
+
+You are free to:
+- Use, modify, and share this tool in commercial and non-commercial projects.
+- No warranty is provided — use at your own risk.
+- You must include the license if you redistribute it.
 
 ---
 
@@ -120,3 +131,13 @@ See the project page at
 🔗 [https://www.ittiger.net/projects/tigerwrap](https://www.ittiger.net/projects/tigerwrap)  
 or file issues at  
 🔗 [https://github.com/rkozlowski/TigerWrap](https://github.com/rkozlowski/TigerWrap)
+---
+
+## 🛡️ Copyright & Project Sponsor
+
+<p align="left">
+  <img src="https://raw.githubusercontent.com/rkozlowski/TigerWrap/main/docs/assets/ItTiger-head.png" alt="IT Tiger Logo" width="120"/>
+</p>
+
+TigerWrap is an open-source project by **IT Tiger**  
+🔗 https://www.ittiger.net/
