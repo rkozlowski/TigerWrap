@@ -59,7 +59,7 @@ It is already stable and useful — and evolving quickly.
 
 ## 🛡️ Copyright & Project Sponsor
 
-<p align="center">
+<p align="left">
   <img src="https://raw.githubusercontent.com/rkozlowski/TigerWrap/main/docs/assets/ItTiger-head.png" alt="IT Tiger Logo" width="120"/>
 </p>
 
