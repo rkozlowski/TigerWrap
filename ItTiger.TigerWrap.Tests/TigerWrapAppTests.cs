@@ -39,10 +39,14 @@ public sealed class TigerWrapAppTests
     [InlineData("projects list", "language-code")]
     [InlineData("projects show", "Project name")]
     [InlineData("projects add", "--language")]
+    [InlineData("projects add", "--desc-attr-class")]
     [InlineData("projects update", "--new-name")]
+    [InlineData("projects update", "--desc-attr-namespace")]
     [InlineData("projects sp add", "--langopt-reset")]
     [InlineData("projects sp remove", "Stored procedure mapping ID")]
     [InlineData("projects enum add", "--name-match")]
+    [InlineData("projects enum add", "--description-column")]
+    [InlineData("projects enum add", "--desc-attr-class")]
     [InlineData("projects enum remove", "Enum mapping ID")]
     [InlineData("projects norm add", "--name-part")]
     [InlineData("projects norm remove", "Normalization ID")]
@@ -163,6 +167,42 @@ public sealed class TigerWrapAppTests
         Assert.Equal("language-options", set.Provider);
         Assert.NotNull(GetMultiSelect<ProjectsSpAddCommand.Settings>(nameof(ProjectsSpAddCommand.Settings.LanguageOptionsReset)));
         Assert.NotNull(GetMultiSelect<ProjectsSpAddCommand.Settings>(nameof(ProjectsSpAddCommand.Settings.LanguageOptionsSet)));
+    }
+
+    [Fact]
+    public void ProjectsEnumAdd_SupportsDescriptionAttributeOptions()
+    {
+        var description = GetOption<ProjectsEnumAddCommand.Settings>(nameof(ProjectsEnumAddCommand.Settings.Description));
+        var descriptionColumn = GetOption<ProjectsEnumAddCommand.Settings>(nameof(ProjectsEnumAddCommand.Settings.DescriptionColumn));
+        var attrClass = GetOption<ProjectsEnumAddCommand.Settings>(nameof(ProjectsEnumAddCommand.Settings.DescriptionAttributeClassName));
+        var attrNamespace = GetOption<ProjectsEnumAddCommand.Settings>(nameof(ProjectsEnumAddCommand.Settings.DescriptionAttributeNamespaceName));
+
+        Assert.Equal("--description", description.Aliases.Single());
+        Assert.Equal("--description-column", descriptionColumn.Aliases.Single());
+        Assert.Equal("--desc-attr-class", attrClass.Aliases.Single());
+        Assert.Equal("--desc-attr-namespace", attrNamespace.Aliases.Single());
+        Assert.False(description.Required);
+        Assert.False(descriptionColumn.Required);
+        Assert.False(attrClass.Required);
+        Assert.False(attrNamespace.Required);
+    }
+
+    [Fact]
+    public void ProjectsAddAndUpdate_SupportDescriptionAttributeDefaults()
+    {
+        var addClass = GetOption<ProjectsAddCommand.Settings>(nameof(ProjectsAddCommand.Settings.DescriptionAttributeClassName));
+        var addNamespace = GetOption<ProjectsAddCommand.Settings>(nameof(ProjectsAddCommand.Settings.DescriptionAttributeNamespaceName));
+        var updateClass = GetOption<ProjectsUpdateCommand.Settings>(nameof(ProjectsUpdateCommand.Settings.DescriptionAttributeClassName));
+        var updateNamespace = GetOption<ProjectsUpdateCommand.Settings>(nameof(ProjectsUpdateCommand.Settings.DescriptionAttributeNamespaceName));
+
+        Assert.Equal("--desc-attr-class", addClass.Aliases.Single());
+        Assert.Equal("--desc-attr-namespace", addNamespace.Aliases.Single());
+        Assert.Equal("--desc-attr-class", updateClass.Aliases.Single());
+        Assert.Equal("--desc-attr-namespace", updateNamespace.Aliases.Single());
+        Assert.False(addClass.Required);
+        Assert.False(addNamespace.Required);
+        Assert.False(updateClass.Required);
+        Assert.False(updateNamespace.Required);
     }
 
     [Fact]

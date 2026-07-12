@@ -7,7 +7,9 @@
     @paramEnumMappingId TINYINT,
     @mapResultSetEnums BIT,
     @languageOptions BIGINT,
-    @defaultDatabase NVARCHAR(128),    
+    @defaultDatabase NVARCHAR(128),
+    @descriptionAttributeClassName VARCHAR(100) = NULL,
+    @descriptionAttributeNamespaceName VARCHAR(100) = NULL,
 	@projectId SMALLINT OUTPUT,
     @errorMessage NVARCHAR(2000) OUTPUT    
 AS
@@ -61,7 +63,7 @@ BEGIN
         EXEC @rc = [Internal].[CreateProject]
             @name, @namespaceName, @className, @classAccessId, @languageId, @paramEnumMappingId,
             @mapResultSetEnums, @languageOptions, @defaultDatabase, NULL, NULL,
-            @projectId OUTPUT;
+            @projectId OUTPUT, @descriptionAttributeClassName, @descriptionAttributeNamespaceName;
 
         IF @tranCount = 0
             COMMIT TRANSACTION;

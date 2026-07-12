@@ -116,6 +116,40 @@ public enum UserType
 }
 ```
 
+## 🏷️ Description Attributes (optional)
+
+TigerWrap can decorate generated enums and enum members with a description attribute, e.g.
+`[Description("Some text")]` (`System.ComponentModel`) or a custom attribute such as
+`[TigerText("Some text")]`. Only the basic single-string-argument constructor form is supported.
+
+- The attribute class name and namespace can be configured per project
+  (`tiger-wrap projects add/update --desc-attr-class ... --desc-attr-namespace ...`) and
+  overridden per enum mapping (`tiger-wrap projects enum add --desc-attr-class ... --desc-attr-namespace ...`).
+  A mapping-level value takes precedence over the project-level value.
+- `--description` on an enum mapping sets static text emitted as an attribute on each matched enum type.
+- `--description-column` on an enum mapping names a column in the source enum table whose values are
+  emitted as attributes on the corresponding enum members. If a matched table does not contain the
+  column, member attributes are simply skipped for that table.
+- Attributes are only emitted when an attribute class name is in effect; without configuration the
+  generated output is unchanged. The configured namespace is added as a `using` directive when needed.
+
+```
+tiger-wrap projects enum add --schema Enum --nameMatch ExactMatch --namePattern UserType --nameColumn Code \
+    --description-column Description --desc-attr-class DescriptionAttribute --desc-attr-namespace System.ComponentModel
+```
+
+```csharp
+public enum UserType
+{
+    [Description("Full administrative access")]
+    Admin = 1,
+    [Description("Can moderate content")]
+    Moderator = 2,
+    [Description("Read-only visitor")]
+    Guest = 3
+}
+```
+
 ## Notes & Best Practices
 
 ✅ Place enum tables in a dedicated schema (e.g. Enum, Static). Avoid placing them in [dbo].

@@ -9,6 +9,8 @@
 	@languageOptions BIGINT OUTPUT,
 	@paramEnumMappingId TINYINT OUTPUT,
 	@mapResultSetEnums BIT OUTPUT,
+	@descriptionAttributeClassName VARCHAR(100) OUTPUT,
+	@descriptionAttributeNamespaceName VARCHAR(100) OUTPUT,
     @errorMessage NVARCHAR(2000) OUTPUT
 AS
 BEGIN
@@ -28,7 +30,9 @@ BEGIN
 		@classAccessId = p.[ClassAccessId],
 		@languageOptions = p.[LanguageOptions],
 		@paramEnumMappingId = p.[ParamEnumMappingId],
-		@mapResultSetEnums = p.[MapResultSetEnums]
+		@mapResultSetEnums = p.[MapResultSetEnums],
+		@descriptionAttributeClassName = p.[DescriptionAttributeClassName],
+		@descriptionAttributeNamespaceName = p.[DescriptionAttributeNamespaceName]
     FROM [dbo].[Project] p
     WHERE p.[Name] = @projectName;
 

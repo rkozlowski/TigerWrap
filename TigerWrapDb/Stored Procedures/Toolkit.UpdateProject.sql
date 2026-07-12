@@ -9,6 +9,8 @@ CREATE   PROCEDURE [Toolkit].[UpdateProject]
     @mapResultSetEnums BIT = NULL,
     @languageOptions BIGINT = NULL,
     @defaultDatabase NVARCHAR(128) = NULL,
+    @descriptionAttributeClassName VARCHAR(100) = NULL,
+    @descriptionAttributeNamespaceName VARCHAR(100) = NULL,
     @errorMessage NVARCHAR(2000) OUTPUT
 AS
 BEGIN
@@ -84,7 +86,9 @@ BEGIN
             [ParamEnumMappingId] = COALESCE(@paramEnumMappingId, [ParamEnumMappingId]),
             [MapResultSetEnums] = COALESCE(@mapResultSetEnums, [MapResultSetEnums]),
             [LanguageOptions] = COALESCE(@languageOptions, [LanguageOptions]),
-            [DefaultDatabase] = COALESCE(@defaultDatabase, [DefaultDatabase])
+            [DefaultDatabase] = COALESCE(@defaultDatabase, [DefaultDatabase]),
+            [DescriptionAttributeClassName] = COALESCE(@descriptionAttributeClassName, [DescriptionAttributeClassName]),
+            [DescriptionAttributeNamespaceName] = COALESCE(@descriptionAttributeNamespaceName, [DescriptionAttributeNamespaceName])
         WHERE [Id] = @projectId;
 
         IF @tranCount = 0

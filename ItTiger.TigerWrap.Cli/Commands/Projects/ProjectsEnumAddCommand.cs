@@ -51,6 +51,22 @@ public sealed class ProjectsEnumAddCommand(SqlServerConnectionStore connectionSt
 
         [TigerCliOption("--name-column", Description = "Optional name column override.")]
         public string? NameColumn { get; set; } = null;
+
+        [TigerCliOption("--description",
+            Description = "Static description text emitted as a description attribute on matched enums.")]
+        public string? Description { get; set; }
+
+        [TigerCliOption("--description-column",
+            Description = "Column in the source enum table used to read enum member description text.")]
+        public string? DescriptionColumn { get; set; }
+
+        [TigerCliOption("--desc-attr-class",
+            Description = "Description attribute class name override (e.g. DescriptionAttribute).")]
+        public string? DescriptionAttributeClassName { get; set; }
+
+        [TigerCliOption("--desc-attr-namespace",
+            Description = "Namespace override of the description attribute class (e.g. System.ComponentModel).")]
+        public string? DescriptionAttributeNamespaceName { get; set; }
     }
 
     public override async Task<int> ExecuteAsync(Settings settings)
@@ -80,7 +96,11 @@ public sealed class ProjectsEnumAddCommand(SqlServerConnectionStore connectionSt
                 namePattern: settings.NamePattern,
                 escChar: settings.EscChar,
                 isSetOfFlags: settings.IsSetOfFlags,
-                nameColumn: settings.NameColumn);
+                nameColumn: settings.NameColumn,
+                description: settings.Description,
+                descriptionColumn: settings.DescriptionColumn,
+                descriptionAttributeClassName: settings.DescriptionAttributeClassName,
+                descriptionAttributeNamespaceName: settings.DescriptionAttributeNamespaceName);
 
             if (rc != 0 || !id.HasValue)
             {

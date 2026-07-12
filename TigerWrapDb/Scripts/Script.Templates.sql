@@ -63,6 +63,9 @@ DECLARE @TT_WRAPPER_ENUM_START TINYINT = 48;
 DECLARE @TT_WRAPPER_ENUM_END TINYINT = 49;
 DECLARE @TT_WRAPPER_ENUM_ITEM TINYINT = 50;
 DECLARE @TT_START_CLASS_BOOTSTRAP TINYINT = 51;
+DECLARE @TT_ENUM_DESC_ATTRIBUTE TINYINT = 52;
+DECLARE @TT_ENUM_ENTRY_DESC_ATTRIBUTE TINYINT = 53;
+DECLARE @TT_EXTRA_USING TINYINT = 54;
 
 DECLARE @LO_GENERATE_STATIC_CLASS BIGINT = 1;
 DECLARE @LO_TREAT_OUTPUT_PARAMS_AS_INPUT_OUTPUT BIGINT = 2;
@@ -135,7 +138,7 @@ using System.Threading;
 using Microsoft.Data.SqlClient;
 using Microsoft.Data.SqlClient.Server;
 using Dapper;
-');
+@{ExtraUsings}');
 
 
 INSERT INTO #Template
@@ -152,7 +155,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.SqlServer.Server;
 using Dapper;
-');
+@{ExtraUsings}');
 
 INSERT INTO #Template
 ([LanguageId], [TypeId], [LanguageOptions], [Template])
@@ -166,7 +169,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Microsoft.SqlServer.Server;
 using Dapper;
-');
+@{ExtraUsings}');
 
 
 INSERT INTO #Template
@@ -352,20 +355,20 @@ VALUES
 INSERT INTO #Template
 ([LanguageId], [TypeId], [Template])
 VALUES
-(@langId, @TT_ENUM_START, 
+(@langId, @TT_ENUM_START,
 N'
         // Source table: @{EnumSchema}.@{EnumTable}
-        @{EnumAccess} enum @{EnumName}
+@{EnumDescAttr}        @{EnumAccess} enum @{EnumName}
         {');
 
 INSERT INTO #Template
 ([LanguageId], [TypeId], [Template])
 VALUES
-(@langId, @TT_ENUM_START_FLAG, 
+(@langId, @TT_ENUM_START_FLAG,
 N'
         // Source table: @{EnumSchema}.@{EnumTable}
         [Flags]
-        @{EnumAccess} enum @{EnumName}
+@{EnumDescAttr}        @{EnumAccess} enum @{EnumName}
         {');
 
 
@@ -381,6 +384,24 @@ INSERT INTO #Template
 ([LanguageId], [TypeId], [Template])
 VALUES
 (@langId, @TT_ENUM_ENTRY, N'            @{Name} = @{Value}@{Sep}');
+
+
+INSERT INTO #Template
+([LanguageId], [TypeId], [Template])
+VALUES
+(@langId, @TT_ENUM_DESC_ATTRIBUTE, N'        [@{DescAttrName}("@{EnumDescription}")]');
+
+
+INSERT INTO #Template
+([LanguageId], [TypeId], [Template])
+VALUES
+(@langId, @TT_ENUM_ENTRY_DESC_ATTRIBUTE, N'            [@{DescAttrName}("@{MemberDescription}")]');
+
+
+INSERT INTO #Template
+([LanguageId], [TypeId], [Template])
+VALUES
+(@langId, @TT_EXTRA_USING, N'using @{ExtraUsingNamespace};');
 
 
 

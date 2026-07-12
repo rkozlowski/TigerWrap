@@ -127,6 +127,14 @@ namespace ItTiger.TigerWrap.Core
             public bool IsSetOfFlags { get; set; }
             [Column(Name="NameColumn")]
             public string NameColumn { get; set; }
+            [Column(Name="Description")]
+            public string Description { get; set; }
+            [Column(Name="DescriptionColumn")]
+            public string DescriptionColumn { get; set; }
+            [Column(Name="DescriptionAttributeClassName")]
+            public string DescriptionAttributeClassName { get; set; }
+            [Column(Name="DescriptionAttributeNamespaceName")]
+            public string DescriptionAttributeNamespaceName { get; set; }
         }
 
 

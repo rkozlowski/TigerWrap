@@ -43,7 +43,7 @@ public sealed class ProjectsShowCommand(SqlServerConnectionStore connectionStore
 
         try
         {
-            var (rc, projectId, languageId, defaultDb, className, ns, classAccess, options, enumMapping, mapEnums, err) =
+            var (rc, projectId, languageId, defaultDb, className, ns, classAccess, options, enumMapping, mapEnums, descAttrClass, descAttrNamespace, err) =
                 await db.GetProjectDetailsAsync(settings.ProjectName);
 
             if (rc != 0 || !projectId.HasValue)
@@ -65,6 +65,7 @@ public sealed class ProjectsShowCommand(SqlServerConnectionStore connectionStore
                 .Add(settings.T("Class Access:"), classAccess)
                 .Add(settings.T("Enum Mapping:"), enumMapping)
                 .Add(settings.T("Map Enums in Result Sets:"), mapEnums.HasValue ? (mapEnums.Value ? "Yes" : "No") : null)
+                .AddOptional(settings.T("Description Attribute:"), FormatDescriptionAttribute(descAttrClass, descAttrNamespace))
                 .Add(settings.T("Options:"), optHex)
                 .AddOptional(settings.T("Option Names:"), optNames);
 
@@ -103,9 +104,20 @@ public sealed class ProjectsShowCommand(SqlServerConnectionStore connectionStore
             .AddColumn(settings.T("Name Pattern"), row => row.NamePattern)
             .AddColumn(settings.T("Esc Char"), row => row.EscChar)
             .AddColumn(settings.T("Set Of Flags"), row => row.IsSetOfFlags)
-            .AddColumn(settings.T("Name Column"), row => row.NameColumn);
+            .AddColumn(settings.T("Name Column"), row => row.NameColumn)
+            .AddColumn(settings.T("Description"), row => row.Description).SetWidth(maxWidth: 30).SetWrapping(CliWrapping.CharWrapTruncate)
+            .AddColumn(settings.T("Desc Column"), row => row.DescriptionColumn)
+            .AddColumn(settings.T("Desc Attribute"), row => FormatDescriptionAttribute(row.DescriptionAttributeClassName, row.DescriptionAttributeNamespaceName));
 
         TigerConsole.Render(list.Render(rows));
+    }
+
+    private static string? FormatDescriptionAttribute(string? className, string? namespaceName)
+    {
+        if (string.IsNullOrWhiteSpace(className))
+            return string.IsNullOrWhiteSpace(namespaceName) ? null : namespaceName;
+
+        return string.IsNullOrWhiteSpace(namespaceName) ? className : $"{namespaceName}.{className}";
     }
 
     private static async Task RenderStoredProcedureMappingsAsync(

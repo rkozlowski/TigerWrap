@@ -11,6 +11,10 @@
 --   @escChar        - Escape character used in pattern (if any)
 --   @isSetOfFlags   - Whether this enum is a set of flags
 --   @nameColumn     - Column name for enum display name
+--   @description    - Static description text for matched enums (description attribute argument)
+--   @descriptionColumn - Column in the source enum table used to read enum member description text
+--   @descriptionAttributeClassName     - Description attribute class name override (e.g. DescriptionAttribute)
+--   @descriptionAttributeNamespaceName - Description attribute namespace override (e.g. System.ComponentModel)
 --   @id             - ID of the inserted or existing row
 --   @errorMessage   - detailed error message if any
 -- =============================================
@@ -22,6 +26,10 @@ CREATE PROCEDURE [Toolkit].[AddProjectEnumMapping]
     @escChar        NCHAR(1),
     @isSetOfFlags   BIT,
     @nameColumn     NVARCHAR(128),
+    @description    NVARCHAR(500) = NULL,
+    @descriptionColumn NVARCHAR(128) = NULL,
+    @descriptionAttributeClassName VARCHAR(100) = NULL,
+    @descriptionAttributeNamespaceName VARCHAR(100) = NULL,
     @id             INT OUTPUT,
     @errorMessage   NVARCHAR(4000) OUTPUT
 AS
@@ -101,11 +109,13 @@ BEGIN
 
         INSERT INTO [dbo].[ProjectEnum]
         (
-			[ProjectId], [Schema], [NameMatchId], [NamePattern], [EscChar], [IsSetOfFlags], [NameColumn]
+			[ProjectId], [Schema], [NameMatchId], [NamePattern], [EscChar], [IsSetOfFlags], [NameColumn],
+			[Description], [DescriptionColumn], [DescriptionAttributeClassName], [DescriptionAttributeNamespaceName]
         )
         VALUES
         (
-			@projectId, @schema, @nameMatchId, @namePattern, @escChar, @isSetOfFlags, @nameColumn
+			@projectId, @schema, @nameMatchId, @namePattern, @escChar, @isSetOfFlags, @nameColumn,
+			@description, @descriptionColumn, @descriptionAttributeClassName, @descriptionAttributeNamespaceName
         );
 
         SET @id = SCOPE_IDENTITY();

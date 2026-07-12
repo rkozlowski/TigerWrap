@@ -68,6 +68,16 @@ public sealed class ProjectsUpdateCommand(SqlServerConnectionStore connectionSto
             Description = "Language options to enable.")]
         [TigerCliMultiSelect]
         public long[]? LanguageOptions { get; set; }
+
+        [TigerCliOption("--desc-attr-class",
+            Promptable = TigerCliPromptable.Normal,
+            Description = "Default description attribute class name for generated enums (e.g. DescriptionAttribute).")]
+        public string? DescriptionAttributeClassName { get; set; }
+
+        [TigerCliOption("--desc-attr-namespace",
+            Promptable = TigerCliPromptable.Normal,
+            Description = "Namespace of the default description attribute class (e.g. System.ComponentModel).")]
+        public string? DescriptionAttributeNamespaceName { get; set; }
     }
 
     internal static async Task<TigerCliEditLoad<Settings>> LoadAsync(
@@ -93,6 +103,8 @@ public sealed class ProjectsUpdateCommand(SqlServerConnectionStore connectionSto
             ClassAccess = project.ClassAccessId,
             ParamEnumMapping = project.ParamEnumMappingId,
             MapResultSetEnums = project.MapResultSetEnums,
+            DescriptionAttributeClassName = project.DescriptionAttributeClassName,
+            DescriptionAttributeNamespaceName = project.DescriptionAttributeNamespaceName,
             LanguageOptions = await ProjectCommandProviders.ExpandLanguageOptionsAsync(
                 db,
                 project.LanguageId,
@@ -131,7 +143,9 @@ public sealed class ProjectsUpdateCommand(SqlServerConnectionStore connectionSto
                 paramEnumMappingId: settings.ParamEnumMapping,
                 mapResultSetEnums: settings.MapResultSetEnums,
                 languageOptions: languageOptions,
-                defaultDatabase: settings.DefaultDatabase);
+                defaultDatabase: settings.DefaultDatabase,
+                descriptionAttributeClassName: settings.DescriptionAttributeClassName,
+                descriptionAttributeNamespaceName: settings.DescriptionAttributeNamespaceName);
 
             if (updateRc != 0)
             {

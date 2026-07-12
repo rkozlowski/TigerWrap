@@ -39,6 +39,10 @@ namespace ItTiger.TigerWrap.Core
             string escChar,
             bool? isSetOfFlags,
             string nameColumn,
+            string description,
+            string descriptionColumn,
+            string descriptionAttributeClassName,
+            string descriptionAttributeNamespaceName,
             CancellationToken cancellationToken = default
         )
         {
@@ -52,6 +56,10 @@ namespace ItTiger.TigerWrap.Core
             p.Add("@escChar", escChar);
             p.Add("@isSetOfFlags", isSetOfFlags);
             p.Add("@nameColumn", nameColumn);
+            p.Add("@description", description);
+            p.Add("@descriptionColumn", descriptionColumn);
+            p.Add("@descriptionAttributeClassName", descriptionAttributeClassName);
+            p.Add("@descriptionAttributeNamespaceName", descriptionAttributeNamespaceName);
             p.Add("@id", null, DbType.Int32, ParameterDirection.Output, null, null, null);
             p.Add("@errorMessage", null, DbType.String, ParameterDirection.Output, 8000, null, null);
             p.Add("@returnValue", dbType: DbType.Int32, direction: ParameterDirection.ReturnValue);
@@ -198,6 +206,8 @@ namespace ItTiger.TigerWrap.Core
             bool? mapResultSetEnums,
             long? languageOptions,
             string defaultDatabase,
+            string descriptionAttributeClassName,
+            string descriptionAttributeNamespaceName,
             CancellationToken cancellationToken = default
         )
         {
@@ -213,6 +223,8 @@ namespace ItTiger.TigerWrap.Core
             p.Add("@mapResultSetEnums", mapResultSetEnums);
             p.Add("@languageOptions", languageOptions);
             p.Add("@defaultDatabase", defaultDatabase);
+            p.Add("@descriptionAttributeClassName", descriptionAttributeClassName);
+            p.Add("@descriptionAttributeNamespaceName", descriptionAttributeNamespaceName);
             p.Add("@projectId", null, DbType.Int16, ParameterDirection.Output, null, null, null);
             p.Add("@errorMessage", null, DbType.String, ParameterDirection.Output, 4000, null, null);
             p.Add("@returnValue", dbType: DbType.Int32, direction: ParameterDirection.ReturnValue);
@@ -553,6 +565,8 @@ namespace ItTiger.TigerWrap.Core
             long? LanguageOptions,
             ToolkitDbHelper.ParamEnumMapping? ParamEnumMappingId,
             bool? MapResultSetEnums,
+            string DescriptionAttributeClassName,
+            string DescriptionAttributeNamespaceName,
             string ErrorMessage
         )> GetProjectDetailsAsync(
             string projectName,
@@ -572,6 +586,8 @@ namespace ItTiger.TigerWrap.Core
             p.Add("@languageOptions", null, DbType.Int64, ParameterDirection.Output, null, null, null);
             p.Add("@paramEnumMappingId", null, DbType.Byte, ParameterDirection.Output, null, null, null);
             p.Add("@mapResultSetEnums", null, DbType.Boolean, ParameterDirection.Output, null, null, null);
+            p.Add("@descriptionAttributeClassName", null, DbType.AnsiString, ParameterDirection.Output, 100, null, null);
+            p.Add("@descriptionAttributeNamespaceName", null, DbType.AnsiString, ParameterDirection.Output, 100, null, null);
             p.Add("@errorMessage", null, DbType.String, ParameterDirection.Output, 4000, null, null);
             p.Add("@returnValue", dbType: DbType.Int32, direction: ParameterDirection.ReturnValue);
             
@@ -599,6 +615,8 @@ namespace ItTiger.TigerWrap.Core
             var languageOptions = p.Get<long?>("@languageOptions");
             var paramEnumMappingId = (ToolkitDbHelper.ParamEnumMapping?) p.Get<byte?>("@paramEnumMappingId");
             var mapResultSetEnums = p.Get<bool?>("@mapResultSetEnums");
+            var descriptionAttributeClassName = p.Get<string>("@descriptionAttributeClassName");
+            var descriptionAttributeNamespaceName = p.Get<string>("@descriptionAttributeNamespaceName");
             var errorMessage = p.Get<string>("@errorMessage");
             return (
                 returnValue,
@@ -611,6 +629,8 @@ namespace ItTiger.TigerWrap.Core
                 languageOptions,
                 paramEnumMappingId,
                 mapResultSetEnums,
+                descriptionAttributeClassName,
+                descriptionAttributeNamespaceName,
                 errorMessage
             );
         }
@@ -1019,6 +1039,8 @@ namespace ItTiger.TigerWrap.Core
             bool? mapResultSetEnums,
             long? languageOptions,
             string defaultDatabase,
+            string descriptionAttributeClassName,
+            string descriptionAttributeNamespaceName,
             CancellationToken cancellationToken = default
         )
         {
@@ -1034,6 +1056,8 @@ namespace ItTiger.TigerWrap.Core
             p.Add("@mapResultSetEnums", mapResultSetEnums);
             p.Add("@languageOptions", languageOptions);
             p.Add("@defaultDatabase", defaultDatabase);
+            p.Add("@descriptionAttributeClassName", descriptionAttributeClassName);
+            p.Add("@descriptionAttributeNamespaceName", descriptionAttributeNamespaceName);
             p.Add("@errorMessage", null, DbType.String, ParameterDirection.Output, 4000, null, null);
             p.Add("@returnValue", dbType: DbType.Int32, direction: ParameterDirection.ReturnValue);
             

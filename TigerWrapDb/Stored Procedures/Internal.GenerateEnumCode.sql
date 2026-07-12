@@ -23,6 +23,8 @@ BEGIN
 	DECLARE @TT_ENUM_END TINYINT = 4;
 	DECLARE @TT_ENUM_ENTRY TINYINT = 5;
     DECLARE @TT_ENUM_START_FLAG TINYINT = 47;
+    DECLARE @TT_ENUM_DESC_ATTRIBUTE TINYINT = 52;
+    DECLARE @TT_ENUM_ENTRY_DESC_ATTRIBUTE TINYINT = 53;
 
 	DECLARE @className NVARCHAR(100);	
 	DECLARE @langOptions BIGINT;
@@ -45,11 +47,20 @@ BEGIN
 	DECLARE @enumName NVARCHAR(100);
 	DECLARE @enumSchema NVARCHAR(128);
 	DECLARE @enumTable NVARCHAR(128);
-	
+	DECLARE @enumDescription NVARCHAR(500);
+	DECLARE @descAttrName VARCHAR(100);
 
-	SELECT @enumName=[EnumName], @enumSchema=[Schema], @enumTable=[Table], @isSetOfFlags=[IsSetOfFlags]
-	FROM #Enum	
+
+	SELECT @enumName=[EnumName], @enumSchema=[Schema], @enumTable=[Table], @isSetOfFlags=[IsSetOfFlags],
+		@enumDescription=[Description], @descAttrName=[DescriptionAttributeClassName]
+	FROM #Enum
 	WHERE [Id]=@enumId;
+
+	-- Attribute usage in code drops the conventional 'Attribute' suffix (DescriptionAttribute -> [Description(...)]).
+	IF @descAttrName LIKE '%Attribute' AND LEN(@descAttrName) > LEN('Attribute')
+	BEGIN
+		SET @descAttrName = LEFT(@descAttrName, LEN(@descAttrName) - LEN('Attribute'));
+	END
 
 	IF @enumName IS NULL
 	BEGIN		
@@ -72,14 +83,31 @@ BEGIN
 	END
 
 	DECLARE @vars [Internal].[Variable];
-	INSERT INTO @vars ([Name], [Value]) VALUES (N'EnumName', @enumName);	
-	INSERT INTO @vars ([Name], [Value]) VALUES (N'EnumSchema', [Internal].[EscapeString](@langId, QUOTENAME(@enumSchema)));	
+	INSERT INTO @vars ([Name], [Value]) VALUES (N'EnumName', @enumName);
+	INSERT INTO @vars ([Name], [Value]) VALUES (N'EnumSchema', [Internal].[EscapeString](@langId, QUOTENAME(@enumSchema)));
 	INSERT INTO @vars ([Name], [Value]) VALUES (N'EnumTable', [Internal].[EscapeString](@langId, QUOTENAME(@enumTable)));
 	INSERT INTO @vars ([Name], [Value]) VALUES (N'EnumAccess', N'public');
 	INSERT INTO @vars ([Name], [Value]) VALUES (N'Name', NULL);
 	INSERT INTO @vars ([Name], [Value]) VALUES (N'Value', NULL);
 	INSERT INTO @vars ([Name], [Value]) VALUES (N'Sep', N',');
-	
+	INSERT INTO @vars ([Name], [Value]) VALUES (N'DescAttrName', @descAttrName);
+	INSERT INTO @vars ([Name], [Value]) VALUES (N'EnumDescription', [Internal].[EscapeString](@langId, @enumDescription));
+	INSERT INTO @vars ([Name], [Value]) VALUES (N'MemberDescription', NULL);
+
+	-- The enum-level description attribute line is injected into the enum start template
+	-- via the @{EnumDescAttr} variable; when not configured it resolves to an empty string
+	-- and the generated output is unchanged.
+	DECLARE @enumDescAttr NVARCHAR(1200) = NULL;
+
+	IF @descAttrName IS NOT NULL AND @enumDescription IS NOT NULL
+	BEGIN
+		SELECT @enumDescAttr = c.[Text] + NCHAR(10)
+		FROM [Static].[Template] t
+		CROSS APPLY [Internal].[ProcessTemplate](t.[Template], @vars) c
+		WHERE t.[Id]=[Internal].[GetTemplate](@langId, @langOptions, @TT_ENUM_DESC_ATTRIBUTE);
+	END
+
+	INSERT INTO @vars ([Name], [Value]) VALUES (N'EnumDescAttr', @enumDescAttr);
 
 
 	INSERT INTO #Output ([CodePartId], [Schema],  [Text])
@@ -95,22 +123,37 @@ BEGIN
 	DECLARE @lastId INT = (SELECT MAX([Id]) FROM #EnumVal WHERE [EnumId]=@enumId);
 	DECLARE @name NVARCHAR(100);
 	DECLARE @value NVARCHAR(100);
+	DECLARE @memberDescription NVARCHAR(500);
 
 	WHILE @id IS NOT NULL
-	BEGIN		
-		SELECT @name=[Name], @value=[Value] FROM #EnumVal WHERE [Id]=@id;
+	BEGIN
+		SELECT @name=[Name], @value=[Value], @memberDescription=[Description] FROM #EnumVal WHERE [Id]=@id;
 		UPDATE @vars
 		SET [Value]=@name
 		WHERE [Name]=N'Name';
 		UPDATE @vars
 		SET [Value]=@value
 		WHERE [Name]=N'Value';
-		
+
 		IF @id=@lastId
 		BEGIN
 			UPDATE @vars
 			SET [Value]=''
 			WHERE [Name]=N'Sep';
+		END
+
+		IF @descAttrName IS NOT NULL AND @memberDescription IS NOT NULL
+		BEGIN
+			UPDATE @vars
+			SET [Value]=[Internal].[EscapeString](@langId, @memberDescription)
+			WHERE [Name]=N'MemberDescription';
+
+			INSERT INTO #Output ([CodePartId], [Schema],  [Text])
+			SELECT @codePartId, @enumSchema, c.[Text]
+			FROM [Static].[Template] t
+			CROSS APPLY [Internal].[ProcessTemplate](t.[Template], @vars) c
+			WHERE t.[Id]=[Internal].[GetTemplate](@langId, @langOptions, @TT_ENUM_ENTRY_DESC_ATTRIBUTE)
+			ORDER BY c.[Id];
 		END
 
 		INSERT INTO #Output ([CodePartId], [Schema],  [Text])

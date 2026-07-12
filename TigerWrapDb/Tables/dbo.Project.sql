@@ -9,6 +9,8 @@
     [ParamEnumMappingId] TINYINT        CONSTRAINT [DF_Project_ParamEnumMapping] DEFAULT ((1)) NOT NULL,
     [MapResultSetEnums]  BIT            CONSTRAINT [DF_Project_MapResultSetEnums] DEFAULT ((0)) NOT NULL,
     [DefaultDatabase]    NVARCHAR (128) NULL,
+    [DescriptionAttributeClassName]     VARCHAR (100) NULL,
+    [DescriptionAttributeNamespaceName] VARCHAR (100) NULL,
     CONSTRAINT [PK_Project] PRIMARY KEY CLUSTERED ([Id] ASC),
     CONSTRAINT [FK_Project_ClassAccess] FOREIGN KEY ([ClassAccessId]) REFERENCES [Enum].[ClassAccess] ([Id]),
     CONSTRAINT [FK_Project_Language] FOREIGN KEY ([LanguageId]) REFERENCES [Enum].[Language] ([Id]),

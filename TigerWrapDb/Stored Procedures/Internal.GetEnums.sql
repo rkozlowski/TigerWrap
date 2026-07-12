@@ -26,6 +26,13 @@ BEGIN
 		RETURN @rc;
 	END
 
+    DECLARE @projDescriptionAttributeClassName VARCHAR(100);
+    DECLARE @projDescriptionAttributeNamespaceName VARCHAR(100);
+
+    SELECT @projDescriptionAttributeClassName=[DescriptionAttributeClassName], @projDescriptionAttributeNamespaceName=[DescriptionAttributeNamespaceName]
+    FROM [dbo].[Project]
+    WHERE [Id]=@projectId;
+
 	DECLARE @dbName NVARCHAR(128) = DB_NAME(@dbId);
 
 	IF @dbName IS NULL
@@ -55,6 +62,10 @@ BEGIN
         [ValueType] NVARCHAR(128) NOT NULL,
         [IsSetOfFlags] BIT NOT NULL DEFAULT (0),
         [ProjectEnumId] INT NULL,
+        [Description] NVARCHAR(500) NULL,
+        [DescriptionColumn] NVARCHAR(128) NULL,
+        [DescriptionAttributeClassName] VARCHAR(100) NULL,
+        [DescriptionAttributeNamespaceName] VARCHAR(100) NULL,
         UNIQUE ([Schema], [Table])
     );
 
@@ -130,7 +141,10 @@ BEGIN
     -- now filter only selected enums
 
     UPDATE e
-    SET e.[ProjectEnumId]=pe.[Id], e.[IsSetOfFlags]=pe.[IsSetOfFlags]
+    SET e.[ProjectEnumId]=pe.[Id], e.[IsSetOfFlags]=pe.[IsSetOfFlags],
+        e.[Description]=pe.[Description], e.[DescriptionColumn]=pe.[DescriptionColumn],
+        e.[DescriptionAttributeClassName]=COALESCE(pe.[DescriptionAttributeClassName], @projDescriptionAttributeClassName),
+        e.[DescriptionAttributeNamespaceName]=COALESCE(pe.[DescriptionAttributeNamespaceName], @projDescriptionAttributeNamespaceName)
     FROM #EveryEnum e
     JOIN [dbo].[ProjectEnum] pe ON pe.[ProjectId]=@projectId AND pe.[Schema]=e.[Schema] AND [Internal].[IsNameMatch](e.[Table], pe.[NameMatchId], pe.[NamePattern], pe.[EscChar])=1
     LEFT JOIN [dbo].[ProjectEnum] xpe ON xpe.[ProjectId]=@projectId AND xpe.[Schema]=e.[Schema] 
@@ -138,8 +152,10 @@ BEGIN
     AND (xpe.[NameMatchId]<pe.[NameMatchId] OR (xpe.[NameMatchId]=pe.[NameMatchId] AND xpe.[Id]<pe.[Id]))
     WHERE xpe.[Id] IS NULL;
     
-    INSERT INTO #Enum ([Schema], [Table], [NameColumn], [ValueColumn], [ValueType], [IsSetOfFlags])
-    SELECT e.[Schema], e.[Table], e.[NameColumn], e.[ValueColumn], e.[ValueType], e.[IsSetOfFlags]
+    INSERT INTO #Enum ([Schema], [Table], [NameColumn], [ValueColumn], [ValueType], [IsSetOfFlags],
+        [Description], [DescriptionColumn], [DescriptionAttributeClassName], [DescriptionAttributeNamespaceName])
+    SELECT e.[Schema], e.[Table], e.[NameColumn], e.[ValueColumn], e.[ValueType], e.[IsSetOfFlags],
+        e.[Description], e.[DescriptionColumn], e.[DescriptionAttributeClassName], e.[DescriptionAttributeNamespaceName]
     FROM #EveryEnum e
     WHERE e.[ProjectEnumId] IS NOT NULL;
 

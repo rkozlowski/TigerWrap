@@ -4,7 +4,8 @@ AS
 BEGIN
     SET NOCOUNT ON;
 
-    SELECT [Id], [Schema], [NameMatchId], [NamePattern], [EscChar], [IsSetOfFlags], [NameColumn]
+    SELECT [Id], [Schema], [NameMatchId], [NamePattern], [EscChar], [IsSetOfFlags], [NameColumn],
+		[Description], [DescriptionColumn], [DescriptionAttributeClassName], [DescriptionAttributeNamespaceName]
 	FROM [dbo].[ProjectEnum]
 	WHERE [ProjectId]=@projectId
 	ORDER BY [Id];

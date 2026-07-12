@@ -7,6 +7,10 @@
     [EscChar]      NCHAR (1)      NULL,
     [IsSetOfFlags] BIT            CONSTRAINT [DF_ProjectEnum_IsSetOfFlags] DEFAULT ((0)) NOT NULL,
     [NameColumn]   NVARCHAR (128) NULL,
+    [Description]  NVARCHAR (500) NULL,
+    [DescriptionColumn] NVARCHAR (128) NULL,
+    [DescriptionAttributeClassName]     VARCHAR (100) NULL,
+    [DescriptionAttributeNamespaceName] VARCHAR (100) NULL,
     CONSTRAINT [PK_ProjectEnum] PRIMARY KEY CLUSTERED ([Id] ASC),
     CONSTRAINT [FK_ProjectEnum_NameMatch] FOREIGN KEY ([NameMatchId]) REFERENCES [Enum].[NameMatch] ([Id]),
     CONSTRAINT [FK_ProjectEnum_Project] FOREIGN KEY ([ProjectId]) REFERENCES [dbo].[Project] ([Id])

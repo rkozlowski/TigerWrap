@@ -72,17 +72,22 @@ BEGIN
         [EnumName] NVARCHAR(200) NULL,
         [ValueType] NVARCHAR(128) NOT NULL,
         [IsSetOfFlags] BIT NOT NULL DEFAULT (0),
+        [Description] NVARCHAR(500) NULL,
+        [DescriptionColumn] NVARCHAR(128) NULL,
+        [DescriptionAttributeClassName] VARCHAR(100) NULL,
+        [DescriptionAttributeNamespaceName] VARCHAR(100) NULL,
         UNIQUE ([Schema], [Table])
     );
 
     DROP TABLE IF EXISTS #EnumVal;
     CREATE TABLE #EnumVal
     (
-        [Id] INT NOT NULL IDENTITY (1, 1) PRIMARY KEY,        
-        [EnumId] INT NOT NULL,        
+        [Id] INT NOT NULL IDENTITY (1, 1) PRIMARY KEY,
+        [EnumId] INT NOT NULL,
         [Name] VARCHAR(200) NOT NULL,
-        [Value] BIGINT NOT NULL,     
+        [Value] BIGINT NOT NULL,
 		[TempName] VARCHAR(200) NULL,
+        [Description] NVARCHAR(500) NULL,
         UNIQUE ([EnumId], [Name]),
         UNIQUE ([EnumId], [Value]),
 		UNIQUE ([EnumId], [TempName], [Value])

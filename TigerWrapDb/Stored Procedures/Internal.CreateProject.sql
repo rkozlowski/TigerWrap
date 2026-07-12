@@ -10,17 +10,19 @@
     @defaultDatabase NVARCHAR(128) = NULL,
     @enumSchema NVARCHAR(128) = NULL,
     @storedProcSchema NVARCHAR(128) = NULL,
-    @projectId SMALLINT OUTPUT
+    @projectId SMALLINT OUTPUT,
+    @descriptionAttributeClassName VARCHAR(100) = NULL,
+    @descriptionAttributeNamespaceName VARCHAR(100) = NULL
 AS
 BEGIN
     SET NOCOUNT ON;
 
 	DECLARE @NM_ANY TINYINT = 255; -- Enum.NameMatch: 'Any'
 
-    INSERT INTO [dbo].[Project] 
-    ([Name], [NamespaceName], [ClassName], [ClassAccessId], [LanguageId], [ParamEnumMappingId], [MapResultSetEnums], [LanguageOptions], [DefaultDatabase])
+    INSERT INTO [dbo].[Project]
+    ([Name], [NamespaceName], [ClassName], [ClassAccessId], [LanguageId], [ParamEnumMappingId], [MapResultSetEnums], [LanguageOptions], [DefaultDatabase], [DescriptionAttributeClassName], [DescriptionAttributeNamespaceName])
     VALUES
-    (@name, @namespaceName, @className, @classAccessId, @languageId, @paramEnumMappingId, @mapResultSetEnums, @languageOptions, @defaultDatabase);
+    (@name, @namespaceName, @className, @classAccessId, @languageId, @paramEnumMappingId, @mapResultSetEnums, @languageOptions, @defaultDatabase, @descriptionAttributeClassName, @descriptionAttributeNamespaceName);
 
     SET @projectId = SCOPE_IDENTITY();
 

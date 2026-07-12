@@ -73,6 +73,14 @@ public sealed class ProjectsAddCommand(SqlServerConnectionStore connectionStore)
             Description = "Language options to enable.")]
         [TigerCliMultiSelect]
         public long[]? LanguageOptions { get; set; }
+
+        [TigerCliOption("--desc-attr-class",
+            Description = "Default description attribute class name for generated enums (e.g. DescriptionAttribute).")]
+        public string? DescriptionAttributeClassName { get; set; }
+
+        [TigerCliOption("--desc-attr-namespace",
+            Description = "Namespace of the default description attribute class (e.g. System.ComponentModel).")]
+        public string? DescriptionAttributeNamespaceName { get; set; }
     }
 
     public override async Task<int> ExecuteAsync(Settings settings)
@@ -99,7 +107,9 @@ public sealed class ProjectsAddCommand(SqlServerConnectionStore connectionStore)
                 paramEnumMappingId: settings.ParamEnumMapping,
                 mapResultSetEnums: settings.MapResultSetEnums,
                 languageOptions: languageOptions,
-                defaultDatabase: settings.DefaultDatabase);
+                defaultDatabase: settings.DefaultDatabase,
+                descriptionAttributeClassName: settings.DescriptionAttributeClassName,
+                descriptionAttributeNamespaceName: settings.DescriptionAttributeNamespaceName);
 
             if (rc != 0 || !projectId.HasValue)
             {

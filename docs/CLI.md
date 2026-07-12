@@ -121,6 +121,17 @@ tiger-wrap projects enum add MyLocalTigerWrap TestDbProject   --schema Enum --na
 
 TigerWrap will generate corresponding C# enums.
 
+Optionally, enums and enum members can be decorated with a description attribute
+(see [ENUMS.md](ENUMS.md) for details):
+
+```bash
+tiger-wrap projects enum add MyLocalTigerWrap TestDbProject   --schema Enum --nameMatch Any   --description-column Description   --desc-attr-class DescriptionAttribute   --desc-attr-namespace System.ComponentModel
+```
+
+Project-level defaults for the attribute class and namespace can be set with
+`tiger-wrap projects add/update --desc-attr-class ... --desc-attr-namespace ...`;
+mapping-level values override them.
+
 ---
 
 ### 🔹 5. Generate Code
