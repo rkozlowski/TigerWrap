@@ -1,94 +1,86 @@
-﻿using System.ComponentModel;
-using ItTiger.TigerWrap.Cli.Helpers;
+using System.ComponentModel;
+using ItTiger.TigerCli.Commands;
+using ItTiger.TigerCli.Enums;
+using ItTiger.TigerCli.Terminal;
 using ItTiger.TigerWrap.Core;
-using ItTiger.TigerWrap.Core.Services;
-using Microsoft.Extensions.Logging;
-using Spectre.Console;
-using Spectre.Console.Cli;
-using static ItTiger.TigerWrap.Core.ToolkitDbHelper;
+using ItTiger.TigerQuery.Core;
 
 namespace ItTiger.TigerWrap.Cli.Commands.Projects;
 
-public sealed class ProjectsNormAddCommand(ConnectionService _connectionService, ILogger<ProjectsNormAddCommand> _logger)
-    : AsyncCommand<ProjectsNormAddCommand.Settings>
+public sealed class ProjectsNormAddCommand(SqlServerConnectionStore connectionStore)
+    : TigerCliAsyncCommandHandler<ProjectsNormAddCommand.Settings>
 {
-    public sealed class Settings : GlobalSettings
+    public sealed class Settings : TigerCliSettings
     {
-        [CommandArgument(0, "<CONNECTION_NAME>")]
-        [Description("Connection name to use.")]
+        [TigerCliArgument(0,
+            Name = "connection",
+            Description = "Saved TigerWrap database connection.",
+            Provider = "connections",
+            Promptable = TigerCliPromptable.Normal,
+            AutoSelectSingleChoice = true,
+            MinLength = 1)]
         public string ConnectionName { get; set; } = string.Empty;
 
-        [CommandArgument(1, "<PROJECT_NAME>")]
-        [Description("Name of the project to modify.")]
+        [TigerCliArgument(1,
+            Name = "project",
+            Description = "Project name.",
+            Provider = "projects",
+            Promptable = TigerCliPromptable.Normal,
+            AutoSelectSingleChoice = true,
+            MinLength = 1)]
         public string ProjectName { get; set; } = string.Empty;
 
-        [CommandOption("--name-part")]
-        [Description("The name part to normalize (e.g. tbl, usp)")]
-        public string? NamePart { get; set; }
+        [TigerCliOption("--name-part",
+            Required = true,
+            Promptable = TigerCliPromptable.Normal,
+            MinLength = 1,
+            Description = "Name part to normalize.")]
+        public string NamePart { get; set; } = string.Empty;
 
-        [CommandOption("--type")]
-        [Description("Name part type")]
-        public NamePartType? NamePartTypeId { get; set; }
-
-        public override ValidationResult Validate()
-        {
-            if (string.IsNullOrWhiteSpace(ConnectionName))
-                return ValidationResult.Error("Missing connection name.");
-
-            if (string.IsNullOrWhiteSpace(ProjectName))
-                return ValidationResult.Error("Missing project name.");
-
-            return ValidationResult.Success();
-        }
+        [TigerCliOption("--type", Required = true, Promptable = TigerCliPromptable.Normal, Description = "Name part type.")]
+        public ToolkitDbHelper.NamePartType? NamePartTypeId { get; set; }
     }
 
-    public override async Task<int> ExecuteAsync(CommandContext context, Settings s)
+    public override async Task<int> ExecuteAsync(Settings settings)
     {
-        var (db, error) = await ToolkitHelper.TryResolveDbHelperAsync(_connectionService, s.ConnectionName);
-        if (db == null)
+        var (db, error) = await ToolkitHelper.TryResolveDbHelperAsync(
+            connectionStore,
+            settings.ConnectionName);
+        if (db is null)
         {
-            return CliHelper.Fail(ToolkitResponseCode.CliMissingConnection, error, _logger);
+            TigerConsole.MarkupErrorLine(settings.E("{0}", error));
+            return (int)ToolkitDbHelper.ToolkitResponseCode.CliMissingConnection;
         }
 
-        var (rc, projectId, _, _, _, _) = await db.GetProjectInfoAsync(s.ProjectName);
-        if (rc != 0 || projectId is null)
+        try
         {
-            return CliHelper.Fail((ToolkitResponseCode)rc, $"Could not find project: {Markup.Escape(s.ProjectName)}", _logger);
-        }
+            var project = await db.GetProjectInfoAsync(settings.ProjectName);
+            if (project.ReturnValue != 0 || project.ProjectId is null)
+            {
+                TigerConsole.MarkupErrorLine(settings.E("Could not find project: {0}", settings.ProjectName));
+                return project.ReturnValue;
+            }
 
-        var namePart = s.NamePart;
-        if (string.IsNullOrWhiteSpace(namePart) && !s.NonInteractive)
+            var (rc, id, err) = await db.AddProjectNameNormalizationAsync(
+                projectId: project.ProjectId,
+                namePart: settings.NamePart,
+                namePartTypeId: settings.NamePartTypeId);
+
+            if (rc != 0 || id is null)
+            {
+                TigerConsole.MarkupErrorLine(settings.E("{0}", err));
+                return rc;
+            }
+
+            TigerConsole.MarkupLine(settings.E(
+                "[Success]Name normalization added successfully (ID: {0}).[/]",
+                id.Value));
+            return (int)ToolkitDbHelper.ToolkitResponseCode.Ok;
+        }
+        catch (Exception ex)
         {
-            namePart = AnsiConsole.Ask<string>("Enter the [green]name part[/] to normalize (e.g. tbl, usp):");
+            TigerConsole.MarkupErrorLine(settings.E("{0}", ex.Message));
+            return (int)ToolkitDbHelper.ToolkitResponseCode.CliUnhandledException;
         }
-
-        if (string.IsNullOrWhiteSpace(namePart))
-        {
-            return CliHelper.Fail(ToolkitResponseCode.CliMissingParameter, "Missing --name-part", _logger);
-        }
-
-        var namePartType = s.NamePartTypeId;
-        if (!namePartType.HasValue && !s.NonInteractive)
-        {
-            namePartType = await CliHelper.SelectEnumValueAsync<NamePartType>("Select [green]name part type[/]:");
-        }
-
-        if (!namePartType.HasValue)
-        {
-            return CliHelper.Fail(ToolkitResponseCode.CliMissingParameter, "Missing --type", _logger);
-        }
-
-        var (addRc, id, err) = await db.AddProjectNameNormalizationAsync(
-            projectId: projectId,
-            namePart: namePart,
-            namePartTypeId: namePartType);
-
-        if (addRc != 0 || id == null)
-        {
-            return CliHelper.Fail((ToolkitResponseCode)addRc, err, _logger);
-        }
-
-        AnsiConsole.MarkupLine($"[green]Name normalization added successfully (ID: {id})[/]");
-        return 0;
     }
 }

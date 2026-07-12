@@ -3,10 +3,10 @@
 //
 //     Project name:    TigerWrapToolkit
 //     Source database: TigerWrapDb
-//     Timestamp:       2025-07-07 15:24:31
+//     Timestamp:       2026-07-02 22:04:54
 //     Tool name:       TigerWrap
 //     Tool database:   TigerWrapDb
-//     Tool version:    0.8.7
+//     Tool version:    0.9.0
 //     Tool URL:        https://github.com/rkozlowski/TigerWrap
 //
 //     Changes to this file may cause incorrect behavior 
@@ -207,7 +207,15 @@ namespace ItTiger.TigerWrap.Core
             CliMissingProject = 1005,
             CliCodeGenerationFailed = 1006,
             CliMissingParameter = 1007,
-            CliNoItemsAvailable = 1008
+            CliNoItemsAvailable = 1008,
+            TigerCliGenericFail = 2002,
+            TigerCliInvalidArguments = 2003,
+            TigerCliMissingRequiredArgument = 2004,
+            TigerCliValidationError = 2005,
+            TigerCliInteractiveNotAllowed = 2006,
+            TigerCliNoCommand = 2007,
+            TigerCliUnhandledException = 2008,
+            TigerCliCancelled = 2009
         }
 
 

@@ -1,5 +1,4 @@
-﻿using ItTiger.TigerWrap.Core;
-using ItTiger.TigerWrap.Core.Services;
+using ItTiger.TigerQuery.Core;
 using Microsoft.Data.SqlClient;
 using System;
 using System.Globalization;
@@ -10,21 +9,52 @@ namespace ItTiger.TigerWrap.Core
 {
     public static class ToolkitHelper
     {
+        private const string VendorName = "ItTiger.net";
+        private const string AppName = "TigerWrap";
+
+        public static SqlServerConnectionStoreOptions CreateDefaultConnectionStoreOptions()
+        {
+            return SqlServerConnectionStoreOptions.AppSpecific(VendorName, AppName);
+        }
+
+        public static SqlServerConnectionStore CreateDefaultConnectionStore()
+        {
+            var options = CreateDefaultConnectionStoreOptions();
+            return CreateConnectionStore(options, ensureDirectories: true);
+        }
+
+        public static SqlServerConnectionStore CreateConnectionStore(
+            SqlServerConnectionStoreOptions options,
+            IConnectionPasswordProtector? passwordProtector = null,
+            bool ensureDirectories = false)
+        {
+            ArgumentNullException.ThrowIfNull(options);
+
+            if (ensureDirectories)
+            {
+                EnsureConnectionStoreDirectories(options.FilePath);
+            }
+
+            return passwordProtector is null
+                ? new SqlServerConnectionStore(options)
+                : new SqlServerConnectionStore(options, passwordProtector);
+        }
+
         /// <summary>
         /// Resolves a connection by name, creates a ToolkitDbHelper, and validates it.
         /// Returns null and an error message if any step fails.
         /// </summary>
         public static async Task<(ToolkitDbHelper? db, string? error)> TryResolveDbHelperAsync(
-            ConnectionService connectionService,
+            SqlServerConnectionStore connectionStore,
             string connectionName)
         {
-            var info = connectionService.LoadConnections().FirstOrDefault(c => c.Name == connectionName);
-            if (info == null)
+            var resolution = SqlServerConnectionResolver.Resolve(connectionStore, connectionName);
+            if (!resolution.IsSuccess)
             {
-                return (null, $"Connection named '{connectionName}' not found.");
+                return (null, resolution.ErrorMessage);
             }
 
-            var db = new ToolkitDbHelper(info.BuildConnectionString());
+            var db = new ToolkitDbHelper(resolution.ConnectionString!);
 
             try
             {
@@ -35,6 +65,16 @@ namespace ItTiger.TigerWrap.Core
             {
                 return (null, $"Failed to validate DB connection: {ex.Message}");
             }
+        }
+
+        private static void EnsureConnectionStoreDirectories(string connectionFilePath)
+        {
+            var folder = Path.GetDirectoryName(connectionFilePath);
+            if (string.IsNullOrEmpty(folder))
+                return;
+
+            Directory.CreateDirectory(folder);
+            Directory.CreateDirectory(Path.Combine(folder, "logs"));
         }
 
         /// <summary>

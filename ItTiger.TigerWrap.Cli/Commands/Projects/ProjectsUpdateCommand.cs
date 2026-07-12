@@ -1,160 +1,153 @@
-﻿using ItTiger.TigerWrap.Cli.Helpers;
+using ItTiger.TigerCli.Commands;
+using ItTiger.TigerCli.Enums;
+using ItTiger.TigerCli.Terminal;
 using ItTiger.TigerWrap.Core;
-using ItTiger.TigerWrap.Core.Services;
-using Microsoft.Data.SqlClient;
-using Microsoft.Extensions.Logging;
-using Spectre.Console;
-using Spectre.Console.Cli;
-using System.ComponentModel;
-using static ItTiger.TigerWrap.Core.ToolkitDbHelper;
+using ItTiger.TigerQuery.Core;
 
 namespace ItTiger.TigerWrap.Cli.Commands.Projects;
 
-public sealed class ProjectsUpdateCommand(ConnectionService _connectionService, ILogger<ProjectsUpdateCommand> _logger)
-    : AsyncCommand<ProjectsUpdateCommand.Settings>
+public sealed class ProjectsUpdateCommand(SqlServerConnectionStore connectionStore)
+    : TigerCliAsyncCommandHandler<ProjectsUpdateCommand.Settings>
 {
-    public sealed class Settings : GlobalSettings
+    public sealed class Settings : TigerCliSettings
     {
-        [CommandArgument(0, "<CONNECTION_NAME>")]
-        [Description("The name of the connection to use.")]
+        [TigerCliArgument(0,
+            Name = "connection",
+            Description = "Saved TigerWrap database connection.",
+            Provider = "connections",
+            Promptable = TigerCliPromptable.Normal,
+            AutoSelectSingleChoice = true,
+            MinLength = 1)]
         public string ConnectionName { get; set; } = string.Empty;
 
-        [CommandArgument(1, "<PROJECT_NAME>")]
-        [Description("The name of the project to update.")]
+        [TigerCliArgument(1,
+            Name = "project",
+            Description = "Project name.",
+            Provider = "projects",
+            Promptable = TigerCliPromptable.Normal,
+            AutoSelectSingleChoice = true,
+            MinLength = 1)]
         public string ProjectName { get; set; } = string.Empty;
 
-        [CommandOption("--new-name")]
-        [Description("New name for the project")]
+        [TigerCliOption("--new-name",
+            Promptable = TigerCliPromptable.Normal,
+            MinLength = 1,
+            Description = "New project name.")]
         public string? NewProjectName { get; set; }
 
-        [CommandOption("--namespace")]
-        [Description("New root namespace")]
+        [TigerCliOption("--namespace",
+            Promptable = TigerCliPromptable.Normal,
+            MinLength = 1,
+            Description = "Root namespace for generated code.")]
         public string? NamespaceName { get; set; }
 
-        [CommandOption("--class")]
-        [Description("New class name")]
+        [TigerCliOption("--class",
+            Promptable = TigerCliPromptable.Normal,
+            MinLength = 1,
+            Description = "Class name to generate.")]
         public string? ClassName { get; set; }
 
-        [CommandOption("--class-access")]
-        [Description("New class access modifier")]
-        public ClassAccess? ClassAccess { get; set; }
-
-        [CommandOption("--param-enum-mapping")]
-        [Description("New parameter enum mapping")]
-        public ParamEnumMapping? ParamEnumMapping { get; set; }
-
-        [CommandOption("--map-result-set-enums")]
-        [Description("Enable enum mapping in result sets (yes | no)")]
-        public BoolChoice? MapResultSetEnums { get; set; }
-
-        [CommandOption("--language-options")]
-        [Description("Language options to set (hex or comma-separated flags)")]
-        public string? LanguageOptions { get; set; }
-
-        [CommandOption("--default-db")]
-        [Description("New default database for the project")]
+        [TigerCliOption("--default-db",
+            Provider = "databases",
+            Promptable = TigerCliPromptable.Last,
+            Description = "Default database name for code generation.")]
         public string? DefaultDatabase { get; set; }
 
-        public override ValidationResult Validate()
-        {
-            if (string.IsNullOrWhiteSpace(ConnectionName))
-                return ValidationResult.Error("Missing connection name.");
+        [TigerCliOption("--class-access", Promptable = TigerCliPromptable.Normal, Description = "Class access modifier.")]
+        public ToolkitDbHelper.ClassAccess? ClassAccess { get; set; }
 
-            if (string.IsNullOrWhiteSpace(ProjectName))
-                return ValidationResult.Error("Missing project name.");
+        [TigerCliOption("--param-enum-mapping", Promptable = TigerCliPromptable.Normal, Description = "Parameter enum mapping strategy.")]
+        public ToolkitDbHelper.ParamEnumMapping? ParamEnumMapping { get; set; }
 
-            return ValidationResult.Success();
-        }
+        [TigerCliOption("--map-result-set-enums", Promptable = TigerCliPromptable.Normal, Description = "Enable enum mapping in result sets.")]
+        public bool? MapResultSetEnums { get; set; }
+
+        [TigerCliOption("--language-options",
+            Provider = "language-options",
+            Promptable = TigerCliPromptable.Normal,
+            Description = "Language options to enable.")]
+        [TigerCliMultiSelect]
+        public long[]? LanguageOptions { get; set; }
     }
 
-    public override async Task<int> ExecuteAsync(CommandContext context, Settings s)
+    internal static async Task<TigerCliEditLoad<Settings>> LoadAsync(
+        SqlServerConnectionStore connectionStore,
+        Settings settings)
     {
-        var (db, error) = await ToolkitHelper.TryResolveDbHelperAsync(_connectionService, s.ConnectionName);
-        if (db == null)
+        var (db, _) = await ToolkitHelper.TryResolveDbHelperAsync(
+            connectionStore,
+            settings.ConnectionName);
+        if (db is null)
+            return TigerCliEditLoad<Settings>.NotFound();
+
+        var project = await db.GetProjectDetailsAsync(settings.ProjectName);
+        if (project.ReturnValue != 0 || project.ProjectId is null)
+            return TigerCliEditLoad<Settings>.NotFound();
+
+        return TigerCliEditLoad<Settings>.Found(new Settings
         {
-            return CliHelper.Fail(ToolkitResponseCode.CliMissingConnection, error, _logger);
+            NewProjectName = settings.ProjectName,
+            NamespaceName = project.NamespaceName,
+            ClassName = project.ClassName,
+            DefaultDatabase = project.DefaultDatabase,
+            ClassAccess = project.ClassAccessId,
+            ParamEnumMapping = project.ParamEnumMappingId,
+            MapResultSetEnums = project.MapResultSetEnums,
+            LanguageOptions = await ProjectCommandProviders.ExpandLanguageOptionsAsync(
+                db,
+                project.LanguageId,
+                project.LanguageOptions)
+        });
+    }
+
+    public override async Task<int> ExecuteAsync(Settings settings)
+    {
+        var (db, error) = await ToolkitHelper.TryResolveDbHelperAsync(
+            connectionStore,
+            settings.ConnectionName);
+        if (db is null)
+        {
+            TigerConsole.MarkupErrorLine(settings.E("{0}", error));
+            return (int)ToolkitDbHelper.ToolkitResponseCode.CliMissingConnection;
         }
 
-        var prj = await db.GetProjectDetailsAsync(s.ProjectName);
-        if (prj.ReturnValue != 0 || prj.ProjectId == null)
+        try
         {
-            return CliHelper.Fail((ToolkitResponseCode)prj.ReturnValue, $"Could not find project: {Markup.Escape(s.ProjectName)}", _logger);
+            var project = await db.GetProjectDetailsAsync(settings.ProjectName);
+            if (project.ReturnValue != 0 || project.ProjectId is null)
+            {
+                TigerConsole.MarkupErrorLine(settings.E("Could not find project: {0}", settings.ProjectName));
+                return project.ReturnValue;
+            }
+
+            var languageOptions = ProjectCommandProviders.CombineLanguageOptions(settings.LanguageOptions);
+
+            var (updateRc, updateErr) = await db.UpdateProjectAsync(
+                projectId: project.ProjectId,
+                name: settings.NewProjectName,
+                namespaceName: settings.NamespaceName,
+                className: settings.ClassName,
+                classAccessId: settings.ClassAccess,
+                paramEnumMappingId: settings.ParamEnumMapping,
+                mapResultSetEnums: settings.MapResultSetEnums,
+                languageOptions: languageOptions,
+                defaultDatabase: settings.DefaultDatabase);
+
+            if (updateRc != 0)
+            {
+                TigerConsole.MarkupErrorLine(settings.E("{0}", updateErr));
+                return updateRc;
+            }
+
+            TigerConsole.MarkupLine(settings.E(
+                "[Success]Project '{0}' updated successfully.[/]",
+                settings.ProjectName));
+            return (int)ToolkitDbHelper.ToolkitResponseCode.Ok;
         }
-
-        string? name = s.NewProjectName;
-        string? ns = s.NamespaceName;
-        string? cls = s.ClassName;
-        ClassAccess? classAccess = s.ClassAccess;
-        ParamEnumMapping? paramEnumMapping = s.ParamEnumMapping;
-        bool? mapResultSetEnums = s.MapResultSetEnums.ToNullableBool();
-        long? languageOptions = null;
-        string? defaultDb = s.DefaultDatabase;
-
-        if (!s.NonInteractive)
+        catch (Exception ex)
         {
-            if (!classAccess.HasValue)
-            {
-                classAccess = await CliHelper.SelectEnumValueAsync<ClassAccess>(
-                    "Select new [green]class access modifier[/] (Esc to skip):",
-                    currentValue: prj.ClassAccessId);
-            }
-
-            if (!paramEnumMapping.HasValue)
-            {
-                paramEnumMapping = await CliHelper.SelectEnumValueAsync<ParamEnumMapping>(
-                    "Select new [green]parameter enum mapping[/] (Esc to skip):",
-                    currentValue: prj.ParamEnumMappingId);
-            }
-
-            if (!mapResultSetEnums.HasValue)
-            {                
-                mapResultSetEnums = (await CliHelper.AskBoolChoiceAsync("[green]Enable enum mapping in result sets[/]?", BoolChoice.Yes)).AsBool();
-            }
-
-            if (string.IsNullOrWhiteSpace(s.LanguageOptions))
-            {
-                languageOptions = await CliHelper.SelectLanguageOptionsAsync(
-                    "Select [green]language options[/] to apply (optional)",
-                    db,
-                    prj.LanguageId,
-                    prj.LanguageOptions,
-                    true);
-            }
-            else
-            {
-                languageOptions = await ToolkitHelper.ResolveLanguageOptionsAsync(db, prj.LanguageId, s.LanguageOptions);
-            }
-
-            if (string.IsNullOrWhiteSpace(defaultDb))
-            {
-                defaultDb = await CliHelper.SelectDatabaseAsync(db, "Select [green]default database[/]:", prj.DefaultDatabase);
-            }
+            TigerConsole.MarkupErrorLine(settings.E("{0}", ex.Message));
+            return (int)ToolkitDbHelper.ToolkitResponseCode.CliUnhandledException;
         }
-        else
-        {
-            if (!string.IsNullOrWhiteSpace(s.LanguageOptions))
-            {
-                languageOptions = await ToolkitHelper.ResolveLanguageOptionsAsync(db, prj.LanguageId, s.LanguageOptions);
-            }
-        }
-
-        var (updateRc, updateErr) = await db.UpdateProjectAsync(
-            projectId: prj.ProjectId,
-            name: name,
-            namespaceName: ns,
-            className: cls,
-            classAccessId: classAccess,
-            paramEnumMappingId: paramEnumMapping,
-            mapResultSetEnums: mapResultSetEnums,
-            languageOptions: languageOptions,
-            defaultDatabase: defaultDb);
-
-        if (updateRc != 0)
-        {
-            return CliHelper.Fail((ToolkitResponseCode)updateRc, updateErr, _logger);
-        }
-
-        AnsiConsole.MarkupLine($"[green]Project '{Markup.Escape(s.ProjectName)}' updated successfully![/]");
-        return 0;
     }
 }

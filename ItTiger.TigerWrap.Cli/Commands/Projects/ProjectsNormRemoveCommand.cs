@@ -1,96 +1,82 @@
-﻿using System.ComponentModel;
-using ItTiger.TigerWrap.Cli.Helpers;
+using System.ComponentModel;
+using ItTiger.TigerCli.Commands;
+using ItTiger.TigerCli.Enums;
+using ItTiger.TigerCli.Terminal;
 using ItTiger.TigerWrap.Core;
-using ItTiger.TigerWrap.Core.Services;
-using Microsoft.Extensions.Logging;
-using Spectre.Console;
-using Spectre.Console.Cli;
-using static ItTiger.TigerWrap.Core.ToolkitDbHelper;
+using ItTiger.TigerQuery.Core;
 
 namespace ItTiger.TigerWrap.Cli.Commands.Projects;
 
-public sealed class ProjectsNormRemoveCommand(ConnectionService _connectionService, ILogger<ProjectsNormRemoveCommand> _logger)
-    : AsyncCommand<ProjectsNormRemoveCommand.Settings>
+public sealed class ProjectsNormRemoveCommand(SqlServerConnectionStore connectionStore)
+    : TigerCliAsyncCommandHandler<ProjectsNormRemoveCommand.Settings>
 {
-    public sealed class Settings : GlobalSettings
+    public sealed class Settings : TigerCliSettings
     {
-        [CommandArgument(0, "<CONNECTION_NAME>")]
-        [Description("Connection name to use.")]
+        [TigerCliArgument(0,
+            Name = "connection",
+            Description = "Saved TigerWrap database connection.",
+            Provider = "connections",
+            Promptable = TigerCliPromptable.Normal,
+            AutoSelectSingleChoice = true,
+            MinLength = 1)]
         public string ConnectionName { get; set; } = string.Empty;
 
-        [CommandArgument(1, "<PROJECT_NAME>")]
-        [Description("Name of the project to modify.")]
+        [TigerCliArgument(1,
+            Name = "project",
+            Description = "Project name.",
+            Provider = "projects",
+            Promptable = TigerCliPromptable.Normal,
+            AutoSelectSingleChoice = true,
+            MinLength = 1)]
         public string ProjectName { get; set; } = string.Empty;
 
-        [CommandOption("--id")]
-        [Description("Normalization ID to remove (omit for selection prompt)")]
+        [TigerCliOption("--id",
+            Required = true,
+            Provider = "normalizations",
+            Promptable = TigerCliPromptable.Normal,
+            Description = "Normalization ID to remove.")]
         public int? NormalizationId { get; set; }
-
-        public override ValidationResult Validate()
-        {
-            if (string.IsNullOrWhiteSpace(ConnectionName))
-                return ValidationResult.Error("Missing connection name.");
-
-            if (string.IsNullOrWhiteSpace(ProjectName))
-                return ValidationResult.Error("Missing project name.");
-
-            return ValidationResult.Success();
-        }
     }
 
-    public override async Task<int> ExecuteAsync(CommandContext context, Settings s)
+    public override async Task<int> ExecuteAsync(Settings settings)
     {
-        var (db, error) = await ToolkitHelper.TryResolveDbHelperAsync(_connectionService, s.ConnectionName);
-        if (db == null)
+        var (db, error) = await ToolkitHelper.TryResolveDbHelperAsync(
+            connectionStore,
+            settings.ConnectionName);
+        if (db is null)
         {
-            return CliHelper.Fail(ToolkitResponseCode.CliMissingConnection, error, _logger);
+            TigerConsole.MarkupErrorLine(settings.E("{0}", error));
+            return (int)ToolkitDbHelper.ToolkitResponseCode.CliMissingConnection;
         }
 
-        var (rc, projectId, _, _, _, _) = await db.GetProjectInfoAsync(s.ProjectName);
-        if (rc != 0 || projectId is null)
+        try
         {
-            return CliHelper.Fail((ToolkitResponseCode)rc, $"Could not find project: {Markup.Escape(s.ProjectName)}", _logger);
-        }
-
-        var normalizationId = s.NormalizationId;
-
-        if (!normalizationId.HasValue && !s.NonInteractive)
-        {
-            var all = await db.GetProjectNameNormalizationsAsync(projectId);
-            if (all.Count == 0)
+            var project = await db.GetProjectInfoAsync(settings.ProjectName);
+            if (project.ReturnValue != 0 || project.ProjectId is null)
             {
-                return CliHelper.Fail(ToolkitResponseCode.CliNoItemsAvailable, "No name normalizations defined for this project.", _logger);
+                TigerConsole.MarkupErrorLine(settings.E("Could not find project: {0}", settings.ProjectName));
+                return project.ReturnValue;
             }
 
-            var choices = all.Select(x =>
+            var (rc, err) = await db.RemoveProjectNameNormalizationAsync(
+                projectId: project.ProjectId,
+                normalizationId: settings.NormalizationId);
+
+            if (rc != 0)
             {
-                var desc = Markup.Escape($"[{x.Id}] {x.NamePart} ({x.NamePartTypeId})");
-                return new SelectionItem<int>(x.Id, desc);
-            }).ToList();
+                TigerConsole.MarkupErrorLine(settings.E("{0}", err));
+                return rc;
+            }
 
-            normalizationId = AnsiConsole.Prompt(
-                new SelectionPrompt<SelectionItem<int>>()
-                    .Title("Select [green]normalization to remove[/]:")
-                    .AddChoices(choices)
-            ).Value;
+            TigerConsole.MarkupLine(settings.E(
+                "[Success]Name normalization removed successfully (ID: {0}).[/]",
+                settings.NormalizationId));
+            return (int)ToolkitDbHelper.ToolkitResponseCode.Ok;
         }
-
-        if (!normalizationId.HasValue)
+        catch (Exception ex)
         {
-            return CliHelper.Fail(ToolkitResponseCode.CliMissingParameter, "Missing normalization ID (--id)", _logger);
+            TigerConsole.MarkupErrorLine(settings.E("{0}", ex.Message));
+            return (int)ToolkitDbHelper.ToolkitResponseCode.CliUnhandledException;
         }
-
-        var (removeRc, err) = await db.RemoveProjectNameNormalizationAsync(
-            projectId: projectId,
-            normalizationId: normalizationId);
-
-        if (removeRc != 0)
-        {
-            return CliHelper.Fail((ToolkitResponseCode)removeRc, err, _logger);
-        }
-
-        AnsiConsole.MarkupLine($"[green]Name normalization removed successfully (ID: {normalizationId})[/]");
-        return 0;
     }
-
 }

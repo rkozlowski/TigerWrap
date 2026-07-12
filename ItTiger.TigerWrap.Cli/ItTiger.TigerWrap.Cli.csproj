@@ -4,32 +4,30 @@
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <AssemblyName>tiger-wrap</AssemblyName>
-	<ApplicationIcon>TigerWrap.ico</ApplicationIcon>	
+	<ApplicationIcon>TigerWrap.ico</ApplicationIcon>
+	<Title>Tiger Wrap</Title>
+	<Product>Tiger Wrap CLI</Product>
+	<Description>CLI tool for generating Tiger-style SQL Server data access code.</Description>
   </PropertyGroup>
 
   <ItemGroup>
-    <None Remove="NLog.config" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Content Include="NLog.config">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </Content>
-  </ItemGroup>
-
-  <ItemGroup>
-    <PackageReference Include="NLog" Version="5.5.0" />
-    <PackageReference Include="NLog.Extensions.Logging" Version="5.5.0" />
-    <PackageReference Include="Spectre.Console" Version="0.50.0" />
-    <PackageReference Include="Spectre.Console.Cli" Version="0.50.0" />
-  </ItemGroup>
-
-  <ItemGroup>
     <ProjectReference Include="..\ItTiger.TigerWrap.Core\ItTiger.TigerWrap.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="ItTiger.TigerWrap.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="ItTiger.Core" Version="0.8.0" />
+    <PackageReference Include="ItTiger.TigerCli" Version="0.8.0" />
+    <PackageReference Include="ItTiger.TigerQuery" Version="0.8.1" />
+    <PackageReference Include="ItTiger.TigerQuery.CliCore" Version="0.8.1" />
+    <PackageReference Include="ItTiger.TigerQuery.Core" Version="0.8.1" />
   </ItemGroup>
 
   <ItemGroup>

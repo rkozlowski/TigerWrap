@@ -1,84 +1,81 @@
-﻿using System.ComponentModel;
-using ItTiger.TigerWrap.Cli.Helpers;
+using System.ComponentModel;
+using ItTiger.TigerCli.Commands;
+using ItTiger.TigerCli.Enums;
+using ItTiger.TigerCli.Terminal;
 using ItTiger.TigerWrap.Core;
-using ItTiger.TigerWrap.Core.Services;
-using Microsoft.Extensions.Logging;
-using Spectre.Console;
-using Spectre.Console.Cli;
-using static ItTiger.TigerWrap.Core.ToolkitDbHelper;
+using ItTiger.TigerQuery.Core;
 
 namespace ItTiger.TigerWrap.Cli.Commands.Projects;
 
-public sealed class ProjectsEnumRemoveCommand(ConnectionService _connectionService, ILogger<ProjectsEnumRemoveCommand> _logger)
-    : AsyncCommand<ProjectsEnumRemoveCommand.Settings>
+public sealed class ProjectsEnumRemoveCommand(SqlServerConnectionStore connectionStore)
+    : TigerCliAsyncCommandHandler<ProjectsEnumRemoveCommand.Settings>
 {
-    public sealed class Settings : GlobalSettings
+    public sealed class Settings : TigerCliSettings
     {
-        [CommandArgument(0, "<CONNECTION_NAME>")]
-        [Description("Connection name to use.")]
+        [TigerCliArgument(0,
+            Name = "connection",
+            Description = "Saved TigerWrap database connection.",
+            Provider = "connections",
+            Promptable = TigerCliPromptable.Normal,
+            AutoSelectSingleChoice = true,
+            MinLength = 1)]
         public string ConnectionName { get; set; } = string.Empty;
 
-        [CommandArgument(1, "<PROJECT_NAME>")]
-        [Description("Name of the project to modify.")]
+        [TigerCliArgument(1,
+            Name = "project",
+            Description = "Project name.",
+            Provider = "projects",
+            Promptable = TigerCliPromptable.Normal,
+            AutoSelectSingleChoice = true,
+            MinLength = 1)]
         public string ProjectName { get; set; } = string.Empty;
 
-        [CommandOption("--id")]
-        [Description("Enum mapping ID to remove (omit for selection prompt)")]
+        [TigerCliOption("--id",
+            Required = true,
+            Provider = "enum-mappings",
+            Promptable = TigerCliPromptable.Normal,
+            Description = "Enum mapping ID to remove.")]
         public int? EnumMappingId { get; set; }
-
-        public override ValidationResult Validate()
-        {
-            if (string.IsNullOrWhiteSpace(ConnectionName))
-                return ValidationResult.Error("Missing connection name.");
-
-            if (string.IsNullOrWhiteSpace(ProjectName))
-                return ValidationResult.Error("Missing project name.");
-
-            return ValidationResult.Success();
-        }
     }
 
-    public override async Task<int> ExecuteAsync(CommandContext context, Settings s)
+    public override async Task<int> ExecuteAsync(Settings settings)
     {
-        var (db, error) = await ToolkitHelper.TryResolveDbHelperAsync(_connectionService, s.ConnectionName);
-        if (db == null)
-            return CliHelper.Fail(ToolkitResponseCode.CliMissingConnection, error, _logger);
-
-        var (rc, projectId, _, _, _, _) = await db.GetProjectInfoAsync(s.ProjectName);
-        if (rc != 0 || projectId is null)
-            return CliHelper.Fail((ToolkitResponseCode)rc, $"Could not find project: {Markup.Escape(s.ProjectName)}", _logger);
-
-        var enumMappingId = s.EnumMappingId;
-
-        if (!enumMappingId.HasValue && !s.NonInteractive)
+        var (db, error) = await ToolkitHelper.TryResolveDbHelperAsync(
+            connectionStore,
+            settings.ConnectionName);
+        if (db is null)
         {
-            var all = await db.GetProjectEnumMappingsAsync(projectId);
-            if (all.Count == 0)
-                return CliHelper.Fail(ToolkitResponseCode.CliNoItemsAvailable, "No enum mappings defined for this project.", _logger);
-
-            var choices = all.Select(x =>
-            {
-                var desc = Markup.Escape($"[{x.Id}] {x.Schema}.{x.NamePattern} ({x.NameMatchId})");
-                return new SelectionItem<int>(x.Id, desc);
-            }).ToList();
-
-            enumMappingId = AnsiConsole.Prompt(
-                new SelectionPrompt<SelectionItem<int>>()
-                    .Title("Select [green]enum mapping to remove[/]:")
-                    .AddChoices(choices)
-            ).Value;
+            TigerConsole.MarkupErrorLine(settings.E("{0}", error));
+            return (int)ToolkitDbHelper.ToolkitResponseCode.CliMissingConnection;
         }
 
-        if (!enumMappingId.HasValue)
-            return CliHelper.Fail(ToolkitResponseCode.CliMissingParameter, "Missing enum mapping ID (--id)", _logger);
+        try
+        {
+            var project = await db.GetProjectInfoAsync(settings.ProjectName);
+            if (project.ReturnValue != 0 || project.ProjectId is null)
+            {
+                TigerConsole.MarkupErrorLine(settings.E("Could not find project: {0}", settings.ProjectName));
+                return project.ReturnValue;
+            }
 
-        var (removeRc, err) = await db.RemoveProjectEnumMappingAsync(projectId, enumMappingId);
-        if (removeRc != 0)
-            return CliHelper.Fail((ToolkitResponseCode)removeRc, err, _logger);
+            var (rc, err) = await db.RemoveProjectEnumMappingAsync(
+                project.ProjectId,
+                settings.EnumMappingId);
+            if (rc != 0)
+            {
+                TigerConsole.MarkupErrorLine(settings.E("{0}", err));
+                return rc;
+            }
 
-        AnsiConsole.MarkupLine($"[green]Enum mapping removed successfully (ID: {enumMappingId})[/]");
-        return 0;
+            TigerConsole.MarkupLine(settings.E(
+                "[Success]Enum mapping removed successfully (ID: {0}).[/]",
+                settings.EnumMappingId));
+            return (int)ToolkitDbHelper.ToolkitResponseCode.Ok;
+        }
+        catch (Exception ex)
+        {
+            TigerConsole.MarkupErrorLine(settings.E("{0}", ex.Message));
+            return (int)ToolkitDbHelper.ToolkitResponseCode.CliUnhandledException;
+        }
     }
-
-
 }

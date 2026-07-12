@@ -1,88 +1,102 @@
-﻿using ItTiger.TigerWrap.Cli.Helpers;
+using ItTiger.TigerCli.Commands;
+using ItTiger.TigerCli.Enums;
+using ItTiger.TigerCli.Terminal;
 using ItTiger.TigerWrap.Core;
-using ItTiger.TigerWrap.Core.Services;
-using Microsoft.Extensions.Logging;
-using Spectre.Console;
-using Spectre.Console.Cli;
-using System.ComponentModel;
-using static ItTiger.TigerWrap.Core.ToolkitDbHelper;
+using ItTiger.TigerQuery.Core;
 
 namespace ItTiger.TigerWrap.Cli.Commands.Projects;
 
-public sealed class ProjectsEnumAddCommand(ConnectionService _connectionService, ILogger<ProjectsEnumAddCommand> _logger)
-    : AsyncCommand<ProjectsEnumAddCommand.Settings>
+public sealed class ProjectsEnumAddCommand(SqlServerConnectionStore connectionStore)
+    : TigerCliAsyncCommandHandler<ProjectsEnumAddCommand.Settings>
 {
-    public sealed class Settings : GlobalSettings
+    public sealed class Settings : TigerCliSettings
     {
-        [CommandArgument(0, "<CONNECTION_NAME>")]
-        [Description("The name of the connection to use.")]
+        [TigerCliArgument(0,
+            Name = "connection",
+            Description = "Saved TigerWrap database connection.",
+            Provider = "connections",
+            Promptable = TigerCliPromptable.Normal,
+            AutoSelectSingleChoice = true,
+            MinLength = 1)]
         public string ConnectionName { get; set; } = string.Empty;
 
-        [CommandArgument(1, "<PROJECT_NAME>")]
-        [Description("The name of the project to update.")]
+        [TigerCliArgument(1,
+            Name = "project",
+            Description = "Project name.",
+            Provider = "projects",
+            Promptable = TigerCliPromptable.Normal,
+            AutoSelectSingleChoice = true,
+            MinLength = 1)]
         public string ProjectName { get; set; } = string.Empty;
 
-        [CommandOption("--schema")]
-        [Description("The schema containing the enum tables.")]
-        public string? Schema { get; set; }
+        [TigerCliOption("--schema",
+            Required = true,
+            Provider = "schemas",
+            Promptable = TigerCliPromptable.Normal,
+            MinLength = 1,
+            Description = "Schema containing the enum tables.")]
+        public string Schema { get; set; } = string.Empty;
 
-        [CommandOption("--name-match")]
-        [Description("Enum name match strategy (e.g. Any, ExactMatch).")]
-        public NameMatch? NameMatch { get; set; } = ToolkitDbHelper.NameMatch.Any;
+        [TigerCliOption("--name-match", Promptable = TigerCliPromptable.Normal, Description = "Enum name match strategy.")]
+        public ToolkitDbHelper.NameMatch? NameMatch { get; set; } = ToolkitDbHelper.NameMatch.Any;
 
-        [CommandOption("--name-pattern")]
-        [Description("Name pattern for matching enum tables.")]
+        [TigerCliOption("--name-pattern", Promptable = TigerCliPromptable.Normal, Description = "Name pattern for matching enum tables.")]
         public string NamePattern { get; set; } = string.Empty;
 
-        [CommandOption("--esc-char")]
-        [Description("Escape character for pattern matching.")]
+        [TigerCliOption("--esc-char", Description = "Escape character for pattern matching.")]
         public string? EscChar { get; set; }
 
-        [CommandOption("--is-set-of-flags")]
-        [Description("Whether the enums are treated as flags (true/false).")]
+        [TigerCliOption("--is-set-of-flags", Description = "Whether the enums are treated as flags.")]
         public bool? IsSetOfFlags { get; set; } = false;
 
-        [CommandOption("--name-column")]
-        [Description("Optional name column override.")]
+        [TigerCliOption("--name-column", Description = "Optional name column override.")]
         public string? NameColumn { get; set; } = null;
-
-        public override ValidationResult Validate()
-        {
-            if (!NameMatch.HasValue || !Enum.IsDefined(typeof(NameMatch), NameMatch.Value))
-                return ValidationResult.Error($"Invalid name match. Valid values: {ToolkitHelper.GetEnumValuesDescription<NameMatch>()}");
-    
-            return base.Validate();
-        }
     }
 
-    public override async Task<int> ExecuteAsync(CommandContext context, Settings s)
+    public override async Task<int> ExecuteAsync(Settings settings)
     {
-        var (db, error) = await ToolkitHelper.TryResolveDbHelperAsync(_connectionService, s.ConnectionName);
-        if (db == null)
-            return CliHelper.Fail(ToolkitResponseCode.CliMissingConnection, error, _logger);
-
-        var (rc, projectId, err) = await db.GetProjectIdAsync(s.ProjectName);
-        if (rc != 0 || !projectId.HasValue)
-            return CliHelper.Fail((ToolkitResponseCode)rc, err, _logger);
-
-        if (string.IsNullOrWhiteSpace(s.Schema) && !s.NonInteractive)
+        var (db, error) = await ToolkitHelper.TryResolveDbHelperAsync(
+            connectionStore,
+            settings.ConnectionName);
+        if (db is null)
         {
-            s.Schema = await CliHelper.SelectSchemaAsync(db, projectId.Value, "Select [green]schema[/]:");
+            TigerConsole.MarkupErrorLine(settings.E("{0}", error));
+            return (int)ToolkitDbHelper.ToolkitResponseCode.CliMissingConnection;
         }
 
-        var (addRc, id, addErr) = await db.AddProjectEnumMappingAsync(
-            projectId: projectId,
-            schema: s.Schema,
-            nameMatchId: s.NameMatch,
-            namePattern: s.NamePattern,
-            escChar: s.EscChar,
-            isSetOfFlags: s.IsSetOfFlags,
-            nameColumn: s.NameColumn);
+        try
+        {
+            var (projectRc, projectId, projectErr) = await db.GetProjectIdAsync(settings.ProjectName);
+            if (projectRc != 0 || !projectId.HasValue)
+            {
+                TigerConsole.MarkupErrorLine(settings.E("{0}", projectErr));
+                return projectRc;
+            }
 
-        if (addRc != 0 || !id.HasValue)
-            return CliHelper.Fail((ToolkitResponseCode)addRc, addErr, _logger);
+            var (rc, id, err) = await db.AddProjectEnumMappingAsync(
+                projectId: projectId,
+                schema: settings.Schema,
+                nameMatchId: settings.NameMatch,
+                namePattern: settings.NamePattern,
+                escChar: settings.EscChar,
+                isSetOfFlags: settings.IsSetOfFlags,
+                nameColumn: settings.NameColumn);
 
-        AnsiConsole.MarkupLine($"[green]Enum mapping added with ID {id}![/]");
-        return 0;
+            if (rc != 0 || !id.HasValue)
+            {
+                TigerConsole.MarkupErrorLine(settings.E("{0}", err));
+                return rc;
+            }
+
+            TigerConsole.MarkupLine(settings.E(
+                "[Success]Enum mapping added successfully (ID: {0}).[/]",
+                id.Value));
+            return (int)ToolkitDbHelper.ToolkitResponseCode.Ok;
+        }
+        catch (Exception ex)
+        {
+            TigerConsole.MarkupErrorLine(settings.E("{0}", ex.Message));
+            return (int)ToolkitDbHelper.ToolkitResponseCode.CliUnhandledException;
+        }
     }
 }

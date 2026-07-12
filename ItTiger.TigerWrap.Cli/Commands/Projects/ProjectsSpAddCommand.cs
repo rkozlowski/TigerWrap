@@ -1,141 +1,114 @@
-﻿using System.ComponentModel;
-using ItTiger.TigerWrap.Cli.Helpers;
+using System.ComponentModel;
+using ItTiger.TigerCli.Commands;
+using ItTiger.TigerCli.Enums;
+using ItTiger.TigerCli.Terminal;
 using ItTiger.TigerWrap.Core;
-using ItTiger.TigerWrap.Core.Services;
-using Microsoft.Extensions.Logging;
-using Spectre.Console;
-using Spectre.Console.Cli;
-using static ItTiger.TigerWrap.Core.ToolkitDbHelper;
+using ItTiger.TigerQuery.Core;
 
 namespace ItTiger.TigerWrap.Cli.Commands.Projects;
 
-public sealed class ProjectsSpAddCommand(ConnectionService _connectionService, ILogger<ProjectsSpAddCommand> _logger)
-    : AsyncCommand<ProjectsSpAddCommand.Settings>
+public sealed class ProjectsSpAddCommand(SqlServerConnectionStore connectionStore)
+    : TigerCliAsyncCommandHandler<ProjectsSpAddCommand.Settings>
 {
-    public sealed class Settings : GlobalSettings
+    public sealed class Settings : TigerCliSettings
     {
-        [CommandArgument(0, "<CONNECTION_NAME>")]
-        [Description("Connection name to use.")]
+        [TigerCliArgument(0,
+            Name = "connection",
+            Description = "Saved TigerWrap database connection.",
+            Provider = "connections",
+            Promptable = TigerCliPromptable.Normal,
+            AutoSelectSingleChoice = true,
+            MinLength = 1)]
         public string ConnectionName { get; set; } = string.Empty;
 
-        [CommandArgument(1, "<PROJECT_NAME>")]
-        [Description("Name of the project to modify.")]
+        [TigerCliArgument(1,
+            Name = "project",
+            Description = "Project name.",
+            Provider = "projects",
+            Promptable = TigerCliPromptable.Normal,
+            AutoSelectSingleChoice = true,
+            MinLength = 1)]
         public string ProjectName { get; set; } = string.Empty;
 
-        [CommandOption("--schema")]
-        [Description("Schema to map (e.g. Toolkit)")]
-        public string? Schema { get; set; }
+        [TigerCliOption("--schema",
+            Required = true,
+            Provider = "schemas",
+            Promptable = TigerCliPromptable.Normal,
+            MinLength = 1,
+            Description = "Schema to map.")]
+        public string Schema { get; set; } = string.Empty;
 
-        [CommandOption("--match")]
-        [Description("Name match type (Any, ExactMatch, Prefix, Suffix, Regex)")]
-        public NameMatch? NameMatch { get; set; } = ToolkitDbHelper.NameMatch.Any;
+        [TigerCliOption("--match", Promptable = TigerCliPromptable.Normal, Description = "Name match type.")]
+        public ToolkitDbHelper.NameMatch? NameMatch { get; set; } = ToolkitDbHelper.NameMatch.Any;
 
-        [CommandOption("--pattern")]
-        [Description("Optional stored procedure name pattern (e.g. Get% or ^sp_.*)")]
+        [TigerCliOption("--pattern", Promptable = TigerCliPromptable.Normal, Description = "Stored procedure name pattern.")]
         public string? Pattern { get; set; }
 
-        [CommandOption("--esc-char")]
-        [Description("Optional escape character for pattern matching")]
+        [TigerCliOption("--esc-char", Description = "Escape character for pattern matching.")]
         public string? EscChar { get; set; }
 
-        [CommandOption("--langopt-reset")]
-        [Description("Language options to reset: hex (0x...) or comma-separated flags")]
-        public string? LangOptReset { get; set; }
+        [TigerCliOption("--langopt-reset",
+            Provider = "language-options",
+            Promptable = TigerCliPromptable.Normal,
+            Description = "Language options to reset.")]
+        [TigerCliMultiSelect]
+        public long[]? LanguageOptionsReset { get; set; }
 
-        [CommandOption("--langopt-set")]
-        [Description("Language options to set: hex (0x...) or comma-separated flags")]
-        public string? LangOptSet { get; set; }
-
-        public override ValidationResult Validate()
-        {
-            if (string.IsNullOrWhiteSpace(ConnectionName))
-            {
-                return ValidationResult.Error("Missing connection name.");
-            }
-
-            if (string.IsNullOrWhiteSpace(ProjectName))
-            {
-                return ValidationResult.Error("Missing project name.");
-            }
-
-            if (!NameMatch.HasValue || !Enum.IsDefined(typeof(NameMatch), NameMatch.Value))
-            {
-                return ValidationResult.Error($"Invalid name match type. Valid values: {ToolkitHelper.GetEnumValuesDescription<NameMatch>()}");
-            }
-
-            return ValidationResult.Success();
-        }
+        [TigerCliOption("--langopt-set",
+            Provider = "language-options",
+            Promptable = TigerCliPromptable.Normal,
+            Description = "Language options to set.")]
+        [TigerCliMultiSelect]
+        public long[]? LanguageOptionsSet { get; set; }
     }
 
-    public override async Task<int> ExecuteAsync(CommandContext context, Settings s)
+    public override async Task<int> ExecuteAsync(Settings settings)
     {
-        var (db, error) = await ToolkitHelper.TryResolveDbHelperAsync(_connectionService, s.ConnectionName);
-        if (db == null)
+        var (db, error) = await ToolkitHelper.TryResolveDbHelperAsync(
+            connectionStore,
+            settings.ConnectionName);
+        if (db is null)
         {
-            return CliHelper.Fail(ToolkitResponseCode.CliMissingConnection, error, _logger);
+            TigerConsole.MarkupErrorLine(settings.E("{0}", error));
+            return (int)ToolkitDbHelper.ToolkitResponseCode.CliMissingConnection;
         }
 
-        var (rc, projectId, languageId, _, _, _) = await db.GetProjectInfoAsync(s.ProjectName);
-        if (rc != 0 || projectId is null)
+        try
         {
-            return CliHelper.Fail((ToolkitResponseCode)rc, $"Could not find project: {Markup.Escape(s.ProjectName)}", _logger);
-        }
+            var project = await db.GetProjectInfoAsync(settings.ProjectName);
+            if (project.ReturnValue != 0 || project.ProjectId is null)
+            {
+                TigerConsole.MarkupErrorLine(settings.E("Could not find project: {0}", settings.ProjectName));
+                return project.ReturnValue;
+            }
 
-        if (string.IsNullOrWhiteSpace(s.Schema) && !s.NonInteractive)
+            var resetValue = ProjectCommandProviders.CombineLanguageOptions(settings.LanguageOptionsReset) ?? 0;
+            var setValue = ProjectCommandProviders.CombineLanguageOptions(settings.LanguageOptionsSet) ?? 0;
+
+            var (rc, id, err) = await db.AddProjectStoredProcMappingAsync(
+                projectId: project.ProjectId,
+                schema: settings.Schema,
+                nameMatchId: settings.NameMatch,
+                namePattern: settings.Pattern,
+                escChar: settings.EscChar,
+                languageOptionsReset: resetValue,
+                languageOptionsSet: setValue);
+
+            if (rc != 0 || id is null)
+            {
+                TigerConsole.MarkupErrorLine(settings.E("{0}", err));
+                return rc;
+            }
+
+            TigerConsole.MarkupLine(settings.E(
+                "[Success]Stored procedure mapping added successfully (ID: {0}).[/]",
+                id.Value));
+            return (int)ToolkitDbHelper.ToolkitResponseCode.Ok;
+        }
+        catch (Exception ex)
         {
-            s.Schema = await CliHelper.SelectSchemaAsync(db, projectId.Value, "Select [green]schema[/]:");
+            TigerConsole.MarkupErrorLine(settings.E("{0}", ex.Message));
+            return (int)ToolkitDbHelper.ToolkitResponseCode.CliUnhandledException;
         }
-
-        long? resetValue;
-        long? setValue;
-
-        if (string.IsNullOrWhiteSpace(s.LangOptReset))
-        {
-            resetValue = s.NonInteractive
-                ? 0
-                : await CliHelper.SelectLanguageOptionsAsync(
-                    prompt: "Select [green]language options to RESET[/] (optional)",
-                    db: db,
-                    languageId: languageId,
-                    optionsValue: null,
-                    isGlobalSelection: false);
-        }
-        else
-        {
-            resetValue = await ToolkitHelper.ResolveLanguageOptionsAsync(db, languageId, s.LangOptReset);
-        }
-
-        if (string.IsNullOrWhiteSpace(s.LangOptSet))
-        {
-            setValue = s.NonInteractive
-                ? 0
-                : await CliHelper.SelectLanguageOptionsAsync(
-                    prompt: "Select [green]language options to SET[/] (optional)",
-                    db: db,
-                    languageId: languageId,
-                    optionsValue: null,
-                    isGlobalSelection: false);
-        }
-        else
-        {
-            setValue = await ToolkitHelper.ResolveLanguageOptionsAsync(db, languageId, s.LangOptSet);
-        }
-
-        var (addRc, id, err) = await db.AddProjectStoredProcMappingAsync(
-            projectId: projectId,
-            schema: s.Schema,
-            nameMatchId: s.NameMatch,
-            namePattern: s.Pattern,
-            escChar: s.EscChar,
-            languageOptionsReset: resetValue,
-            languageOptionsSet: setValue);
-
-        if (addRc != 0 || id == null)
-        {
-            return CliHelper.Fail((ToolkitResponseCode)addRc, err, _logger);
-        }
-
-        AnsiConsole.MarkupLine($"[green]Stored procedure mapping added successfully (ID: {id})[/]");
-        return 0;
     }
 }

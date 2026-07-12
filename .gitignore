@@ -401,3 +401,4 @@ FodyWeavers.xsd
 # Ignore installer build folders
 ItTiger.TigerWrap.Installer/WorkingDir/
 ItTiger.TigerWrap.Installer/Output/
+/.antigravitycli

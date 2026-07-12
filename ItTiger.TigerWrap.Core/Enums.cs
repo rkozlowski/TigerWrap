@@ -2,36 +2,6 @@
 
 namespace ItTiger.TigerWrap.Core;
 
-public enum AuthenticationType
-{
-    [Description("Use Windows Integrated Security")]
-    Integrated,
-
-    [Description("Use SQL Username and Password")]
-    SqlPassword,
-
-    //[Description("Use Entra ID (future)")]
-    //Entra
-}
-
-public enum EncryptOption
-{
-    [Description("No encryption (default)")]
-    Optional,
-
-    [Description("Encryption required")]
-    Mandatory,
-
-    [Description("Strict encryption with certificate validation")]
-    Strict
-}
-public enum PasswordEncryptionType
-{
-    NotApplicable, // e.g. Integrated auth
-    DPAPI,         // Local machine/user
-    //Vault          // Cloud key vault in future
-}
-
 public enum OutputType
 {
     [Description("Write all code into a single file")]

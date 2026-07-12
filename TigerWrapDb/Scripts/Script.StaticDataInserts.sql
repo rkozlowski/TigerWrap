@@ -676,6 +676,34 @@ IF NOT EXISTS (SELECT 1 FROM [Enum].[ToolkitResponseCode] WHERE [Id]=1008)
 INSERT INTO [Enum].[ToolkitResponseCode] ([Id], [Name], [Description], [IsSuccess]) 
 VALUES (1008, N'CliNoItemsAvailable', N'No selectable items available in CLI prompt', 0);
 
+IF NOT EXISTS (SELECT 1 FROM [Enum].[ToolkitResponseCode] WHERE [Id]=2002) 
+INSERT INTO [Enum].[ToolkitResponseCode] ([Id], [Name], [Description], [IsSuccess]) 
+VALUES (2002, N'TigerCliGenericFail', N'Generic fail', 0);
+
+IF NOT EXISTS (SELECT 1 FROM [Enum].[ToolkitResponseCode] WHERE [Id]=2003) 
+INSERT INTO [Enum].[ToolkitResponseCode] ([Id], [Name], [Description], [IsSuccess]) 
+VALUES (2003, N'TigerCliInvalidArguments', N'Invalid arguments', 0);
+
+IF NOT EXISTS (SELECT 1 FROM [Enum].[ToolkitResponseCode] WHERE [Id]=2004) 
+INSERT INTO [Enum].[ToolkitResponseCode] ([Id], [Name], [Description], [IsSuccess]) 
+VALUES (2004, N'TigerCliMissingRequiredArgument', N'Missing required argument', 0);
+
+IF NOT EXISTS (SELECT 1 FROM [Enum].[ToolkitResponseCode] WHERE [Id]=2005) 
+INSERT INTO [Enum].[ToolkitResponseCode] ([Id], [Name], [Description], [IsSuccess]) 
+VALUES (2005, N'TigerCliValidationError', N'Validation error', 0);
+
+IF NOT EXISTS (SELECT 1 FROM [Enum].[ToolkitResponseCode] WHERE [Id]=2006) 
+INSERT INTO [Enum].[ToolkitResponseCode] ([Id], [Name], [Description], [IsSuccess]) 
+VALUES (2006, N'TigerCliInteractiveNotAllowed', N'Interactive not allowed', 0);
+
+IF NOT EXISTS (SELECT 1 FROM [Enum].[ToolkitResponseCode] WHERE [Id]=2007) 
+INSERT INTO [Enum].[ToolkitResponseCode] ([Id], [Name], [Description], [IsSuccess]) 
+VALUES (2007, N'TigerCliNoCommand', N'No command', 0);
+
+IF NOT EXISTS (SELECT 1 FROM [Enum].[ToolkitResponseCode] WHERE [Id]=2008) 
+INSERT INTO [Enum].[ToolkitResponseCode] ([Id], [Name], [Description], [IsSuccess]) 
+VALUES (2008, N'TigerCliUnhandledException', N'Unhandled exception', 0);
+
 
 -- table [Enum].[CodePart]
 --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -732,4 +760,4 @@ VALUES (5, N'T', N'Trace');
 
 
 
--- Completion time: 2025-07-05T16:28:58.8623960+01:00
+-- Completion time: 2026-07-01T22:45:52.4108755+01:00
