@@ -3,10 +3,10 @@
 //
 //     Project name:    TigerWrapToolkit
 //     Source database: TigerWrapDb
-//     Timestamp:       2026-07-02 22:04:54
+//     Timestamp:       2026-07-12 23:43:04
 //     Tool name:       TigerWrap
 //     Tool database:   TigerWrapDb
-//     Tool version:    0.9.0
+//     Tool version:    0.9.1
 //     Tool URL:        https://github.com/rkozlowski/TigerWrap
 //
 //     Changes to this file may cause incorrect behavior 
@@ -19,6 +19,7 @@ using System.Threading;
 using Microsoft.Data.SqlClient;
 using Microsoft.Data.SqlClient.Server;
 using Dapper;
+using System.ComponentModel;
 
 namespace ItTiger.TigerWrap.Core
 {

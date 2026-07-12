@@ -41,10 +41,20 @@ public sealed class ProjectsSpAddCommand(SqlServerConnectionStore connectionStor
         [TigerCliOption("--match", Promptable = TigerCliPromptable.Normal, Description = "Name match type.")]
         public ToolkitDbHelper.NameMatch? NameMatch { get; set; } = ToolkitDbHelper.NameMatch.Any;
 
-        [TigerCliOption("--pattern", Promptable = TigerCliPromptable.Normal, Description = "Stored procedure name pattern.")]
+        [TigerCliOption("--pattern",
+            Promptable = TigerCliPromptable.Normal,
+            RequiredWhenOption = "--match",
+            RequiredWhenValueNotIn = new[] { "Any" },
+            PromptWhenOption = "--match",
+            PromptWhenValueNotIn = new[] { "Any" },
+            Description = "Stored procedure name pattern.")]
         public string? Pattern { get; set; }
 
-        [TigerCliOption("--esc-char", Description = "Escape character for pattern matching.")]
+        [TigerCliOption("--esc-char",
+            Promptable = TigerCliPromptable.Normal,
+            PromptWhenOption = "--match",
+            PromptWhenValue = "Like",
+            Description = "Escape character for pattern matching (LIKE match only).")]
         public string? EscChar { get; set; }
 
         [TigerCliOption("--langopt-reset",
@@ -89,8 +99,8 @@ public sealed class ProjectsSpAddCommand(SqlServerConnectionStore connectionStor
                 projectId: project.ProjectId,
                 schema: settings.Schema,
                 nameMatchId: settings.NameMatch,
-                namePattern: settings.Pattern,
-                escChar: settings.EscChar,
+                namePattern: OptionValues.NullIfEmpty(settings.Pattern),
+                escChar: OptionValues.NullIfEmpty(settings.EscChar),
                 languageOptionsReset: resetValue,
                 languageOptionsSet: setValue);
 

@@ -108,8 +108,8 @@ public sealed class ProjectsAddCommand(SqlServerConnectionStore connectionStore)
                 mapResultSetEnums: settings.MapResultSetEnums,
                 languageOptions: languageOptions,
                 defaultDatabase: settings.DefaultDatabase,
-                descriptionAttributeClassName: settings.DescriptionAttributeClassName,
-                descriptionAttributeNamespaceName: settings.DescriptionAttributeNamespaceName);
+                descriptionAttributeClassName: OptionValues.NullIfEmpty(settings.DescriptionAttributeClassName),
+                descriptionAttributeNamespaceName: OptionValues.NullIfEmpty(settings.DescriptionAttributeNamespaceName));
 
             if (rc != 0 || !projectId.HasValue)
             {

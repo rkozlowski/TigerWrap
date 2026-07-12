@@ -40,10 +40,20 @@ public sealed class ProjectsEnumAddCommand(SqlServerConnectionStore connectionSt
         [TigerCliOption("--name-match", Promptable = TigerCliPromptable.Normal, Description = "Enum name match strategy.")]
         public ToolkitDbHelper.NameMatch? NameMatch { get; set; } = ToolkitDbHelper.NameMatch.Any;
 
-        [TigerCliOption("--name-pattern", Promptable = TigerCliPromptable.Normal, Description = "Name pattern for matching enum tables.")]
-        public string NamePattern { get; set; } = string.Empty;
+        [TigerCliOption("--name-pattern",
+            Promptable = TigerCliPromptable.Normal,
+            RequiredWhenOption = "--name-match",
+            RequiredWhenValueNotIn = new[] { "Any" },
+            PromptWhenOption = "--name-match",
+            PromptWhenValueNotIn = new[] { "Any" },
+            Description = "Name pattern for matching enum tables.")]
+        public string? NamePattern { get; set; }
 
-        [TigerCliOption("--esc-char", Description = "Escape character for pattern matching.")]
+        [TigerCliOption("--esc-char",
+            Promptable = TigerCliPromptable.Normal,
+            PromptWhenOption = "--name-match",
+            PromptWhenValue = "Like",
+            Description = "Escape character for pattern matching (LIKE match only).")]
         public string? EscChar { get; set; }
 
         [TigerCliOption("--is-set-of-flags", Description = "Whether the enums are treated as flags.")]
@@ -93,14 +103,14 @@ public sealed class ProjectsEnumAddCommand(SqlServerConnectionStore connectionSt
                 projectId: projectId,
                 schema: settings.Schema,
                 nameMatchId: settings.NameMatch,
-                namePattern: settings.NamePattern,
-                escChar: settings.EscChar,
+                namePattern: OptionValues.NullIfEmpty(settings.NamePattern),
+                escChar: OptionValues.NullIfEmpty(settings.EscChar),
                 isSetOfFlags: settings.IsSetOfFlags,
-                nameColumn: settings.NameColumn,
-                description: settings.Description,
-                descriptionColumn: settings.DescriptionColumn,
-                descriptionAttributeClassName: settings.DescriptionAttributeClassName,
-                descriptionAttributeNamespaceName: settings.DescriptionAttributeNamespaceName);
+                nameColumn: OptionValues.NullIfEmpty(settings.NameColumn),
+                description: OptionValues.NullIfEmpty(settings.Description),
+                descriptionColumn: OptionValues.NullIfEmpty(settings.DescriptionColumn),
+                descriptionAttributeClassName: OptionValues.NullIfEmpty(settings.DescriptionAttributeClassName),
+                descriptionAttributeNamespaceName: OptionValues.NullIfEmpty(settings.DescriptionAttributeNamespaceName));
 
             if (rc != 0 || !id.HasValue)
             {

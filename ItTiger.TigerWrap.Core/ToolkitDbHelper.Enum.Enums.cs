@@ -3,10 +3,10 @@
 //
 //     Project name:    TigerWrapToolkit
 //     Source database: TigerWrapDb
-//     Timestamp:       2026-07-02 22:04:54
+//     Timestamp:       2026-07-12 23:43:04
 //     Tool name:       TigerWrap
 //     Tool database:   TigerWrapDb
-//     Tool version:    0.9.0
+//     Tool version:    0.9.1
 //     Tool URL:        https://github.com/rkozlowski/TigerWrap
 //
 //     Changes to this file may cause incorrect behavior 
@@ -19,6 +19,7 @@ using System.Threading;
 using Microsoft.Data.SqlClient;
 using Microsoft.Data.SqlClient.Server;
 using Dapper;
+using System.ComponentModel;
 
 namespace ItTiger.TigerWrap.Core
 {
@@ -166,55 +167,102 @@ namespace ItTiger.TigerWrap.Core
             WrapperEnumStart = 48,
             WrapperEnumEnd = 49,
             WrapperEnumItem = 50,
-            StartClassBootstrap = 51
+            StartClassBootstrap = 51,
+            EnumDescAttribute = 52,
+            EnumEntryDescAttribute = 53,
+            ExtraUsing = 54
         }
 
 
         // Source table: [Enum].[ToolkitResponseCode]
+        [Description("Toolkit Response Code")]
         public enum ToolkitResponseCode
         {
+            [Description("Operation completed successfully.")]
             Ok = 0,
+            [Description("An unexpected database error occured.")]
             DbError = 1,
+            [Description("An unexpected internal error occurred.")]
             InternalError = 2,
+            [Description("The specified project does not exist.")]
             UnknownProject = 3,
+            [Description("The provided default database is not valid or accessible.")]
             InvalidDefaultDatabase = 4,
+            [Description("The provided schema is not valid or accessible.")]
             InvalidSchema = 11,
+            [Description("Invalid enum name match pattern.")]
             InvalidEnumPattern = 12,
+            [Description("Invalid stored procedure name match pattern.")]
             InvalidProcPattern = 13,
+            [Description("Invalid class access.")]
             InvalidClassAccess = 14,
+            [Description("Invalid programming language.")]
             InvalidLanguage = 15,
+            [Description("Invalid enum mapping for parameters.")]
             InvalidParamEnumMapping = 16,
+            [Description("The provided database is not valid or accessible.")]
             InvalidDatabase = 17,
+            [Description("Unknown enum")]
             UnknownEnum = 18,
+            [Description("Unknown result type")]
             UnknownResultType = 19,
+            [Description("Unknown table type")]
             UnknownTableType = 20,
+            [Description("Unknown stored procedure")]
             UnknownStoredProcedure = 21,
+            [Description("Project with provided name already exists")]
             DuplicateProject = 22,
+            [Description("Name pattern must be provided")]
             NamePatternNotProvided = 23,
+            [Description("Project enum mapping already exists")]
             DuplicateEnumMapping = 24,
+            [Description("Project stored procedures mapping already exists")]
             DuplicateStoredProcMapping = 25,
+            [Description("Unexpected escape character")]
             UnexpectedEscChar = 26,
+            [Description("Name pattern must be provided")]
             SchemaNotProvided = 27,
+            [Description("Stored procedure mapping not found")]
             UnknownStoredProcMapping = 28,
+            [Description("Enum mapping not found")]
             UnknownEnumMapping = 29,
+            [Description("Invalid name part type.")]
             InvalidNamePartType = 30,
+            [Description("The specified name normalization entry does not exist for this project.")]
             UnknownNameNormalization = 31,
+            [Description("Unexpected application error")]
             CliUnhandledException = 1000,
+            [Description("Failed to write to output file")]
             CliFileWriteError = 1001,
+            [Description("Invalid command-line arguments")]
             CliInvalidArguments = 1002,
+            [Description("Prompt attempted in non-interactive mode")]
             CliInteractiveNotAllowed = 1003,
+            [Description("Named connection not found")]
             CliMissingConnection = 1004,
+            [Description("Project not found")]
             CliMissingProject = 1005,
+            [Description("Code generation failed")]
             CliCodeGenerationFailed = 1006,
+            [Description("Missing command parameter")]
             CliMissingParameter = 1007,
+            [Description("No selectable items available in CLI prompt")]
             CliNoItemsAvailable = 1008,
+            [Description("Generic fail")]
             TigerCliGenericFail = 2002,
+            [Description("Invalid arguments")]
             TigerCliInvalidArguments = 2003,
+            [Description("Missing required argument")]
             TigerCliMissingRequiredArgument = 2004,
+            [Description("Validation error")]
             TigerCliValidationError = 2005,
+            [Description("Interactive not allowed")]
             TigerCliInteractiveNotAllowed = 2006,
+            [Description("No command")]
             TigerCliNoCommand = 2007,
+            [Description("Unhandled exception")]
             TigerCliUnhandledException = 2008,
+            [Description("Cancelled")]
             TigerCliCancelled = 2009
         }
 
