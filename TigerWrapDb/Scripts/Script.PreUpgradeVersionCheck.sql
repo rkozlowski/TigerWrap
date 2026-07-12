@@ -1,15 +1,15 @@
 ﻿USE [$(DatabaseName)];
 GO
 PRINT N'Checking database version before upgrade...';
-DECLARE @expectedName VARCHAR(50) = 'MsSqlProjectHelperDb';
-DECLARE @expectedVersion VARCHAR(50) = '0.8.5';
-DECLARE @newVersion VARCHAR(50) = '0.9.0';
+DECLARE @expectedName VARCHAR(50) = 'TigerWrapDb';
+DECLARE @expectedVersion VARCHAR(50) = '0.9.0';
+DECLARE @newVersion VARCHAR(50) = '0.9.1';
 SET XACT_ABORT ON;
 BEGIN TRY
 	EXEC('DECLARE @name VARCHAR(50) = [DbInfo].[GetName](); DECLARE @ver VARCHAR(50) = [DbInfo].[GetCurrentVersion](); ')
 END TRY
 BEGIN CATCH
-	PRINT N'An error occured.'
+	PRINT N'An error occurred.'
 	PRINT N'Upgrade is not possible.';
 	PRINT N'Check if you are executing this script against proper database.';
 	PRINT N'Expected database type:    ' + @expectedName;
