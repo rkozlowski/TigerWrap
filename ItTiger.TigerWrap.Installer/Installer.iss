@@ -8,6 +8,10 @@
 #include "environment.iss"
 
 [Setup]
+; AppId is the installer identity used for upgrades and by package managers
+; (winget matches the "TigerWrap CLI_is1" uninstall key derived from it).
+; It equals the previously implicit default (AppName) and must never change.
+AppId=TigerWrap CLI
 AppName=TigerWrap CLI
 AppVersion=0.9.0
 DefaultDirName={autopf}\ItTiger\TigerWrap

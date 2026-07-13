@@ -102,7 +102,7 @@ INSERT INTO [Enum].[UserType] (Id, Code) VALUES
 Corresponding enum mapping:
 
 ```
-tiger-wrap projects enum add --schema Enum --nameMatch ExactMatch --namePattern UserType --nameColumn Code
+tiger-wrap projects enum add --schema Enum --name-match ExactMatch --name-pattern UserType --name-column Code
 ```
 
 Generated C# enum:
@@ -134,7 +134,7 @@ TigerWrap can decorate generated enums and enum members with a description attri
   generated output is unchanged. The configured namespace is added as a `using` directive when needed.
 
 ```
-tiger-wrap projects enum add --schema Enum --nameMatch ExactMatch --namePattern UserType --nameColumn Code \
+tiger-wrap projects enum add --schema Enum --name-match ExactMatch --name-pattern UserType --name-column Code \
     --description-column Description --desc-attr-class DescriptionAttribute --desc-attr-namespace System.ComponentModel
 ```
 

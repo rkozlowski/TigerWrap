@@ -36,6 +36,7 @@ TigerWrap does **not** abstract away SQL. It doesn’t try to “save” you fro
 
 ```bash
 tiger-wrap connections add
+tiger-wrap db info
 tiger-wrap projects add
 tiger-wrap projects sp add
 tiger-wrap generate-code
@@ -67,7 +68,7 @@ See [docs/INSTALL.md](docs/INSTALL.md) for full instructions.
 
 ## 🔧 Status
 
-TigerWrap v0.9.0 is a **beta release**.  
+TigerWrap v0.9.1 is a **beta release**.  
 It is already stable and useful — and evolving quickly.
 
 ---

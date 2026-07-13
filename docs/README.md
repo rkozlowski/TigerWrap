@@ -54,6 +54,7 @@ A generated C# method that calls a stored procedure with proper parameters, resu
 
 ```bash
 tiger-wrap connections add
+tiger-wrap db info
 tiger-wrap projects add
 tiger-wrap projects sp add
 tiger-wrap generate-code
@@ -96,6 +97,7 @@ For more reasoning, see:
 
 - SQL Server 2017 or newer recommended
 - CLI and DB use API levels to track compatibility
+- `tiger-wrap db info` shows the database version and compatibility; `tiger-wrap db upgrade` applies the supported schema upgrade
 - For upgrade logic and version detection, see `Toolkit.GetDbInfo`
 
 ---

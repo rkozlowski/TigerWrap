@@ -3,6 +3,7 @@ using ItTiger.TigerCli.Enums;
 using ItTiger.TigerCli.Terminal;
 using ItTiger.TigerCli.Tui.Themes;
 using ItTiger.TigerWrap.Cli.Commands;
+using ItTiger.TigerWrap.Cli.Commands.Db;
 using ItTiger.TigerWrap.Cli.Commands.Projects;
 using ItTiger.TigerWrap.Cli.Commands.ReadOnly;
 using ItTiger.TigerQuery.CliCore;
@@ -49,6 +50,18 @@ internal static class TigerWrapApp
                     options.Store = connectionStore;
                     options.ValidationPolicy = SqlServerConnectionValidationPolicy.DatabaseRequired;
                 });
+            })
+            .AddCommandGroup("db", group =>
+            {
+                group.SetDescription("Inspect and upgrade a TigerWrap database.");
+                group.AddCommand(
+                    "info",
+                    () => new DbInfoCommand(connectionStore),
+                    "Show TigerWrap database version, API level and compatibility.");
+                group.AddCommand(
+                    "upgrade",
+                    () => new DbUpgradeCommand(connectionStore),
+                    $"Upgrade a TigerWrap database ({DbCommandSupport.UpgradeSourceVersion} -> {ExpectedDbInfo.CurrentSchemaVersion}).");
             })
             .AddCommand(
                 "languages-list",

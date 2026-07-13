@@ -6,6 +6,7 @@ using ItTiger.TigerCli.Testing;
 using ItTiger.TigerQuery.Core;
 using ItTiger.TigerWrap.Cli;
 using ItTiger.TigerWrap.Cli.Commands;
+using ItTiger.TigerWrap.Cli.Commands.Db;
 using ItTiger.TigerWrap.Cli.Commands.Projects;
 using ItTiger.TigerWrap.Cli.Commands.ReadOnly;
 using ItTiger.TigerWrap.Core;
@@ -31,6 +32,69 @@ public sealed class TigerWrapAppTests
         Assert.Contains("languages-list", result.StdOut);
         Assert.Contains("generate-code", result.StdOut);
         Assert.Contains("projects", result.StdOut);
+    }
+
+    [Fact]
+    public async Task RootHelp_IncludesDbCommandGroup()
+    {
+        var app = TigerWrapApp.Build(CreateStore());
+
+        var result = await TigerCliAppTestHost
+            .For(app)
+            .WithArgs("--help")
+            .RunAsync(CancellationToken.None);
+
+        Assert.Equal(0, result.ExitCode);
+        Assert.Contains("db", result.StdOut);
+        Assert.Contains("Inspect and upgrade a TigerWrap database", result.StdOut);
+    }
+
+    [Theory]
+    [InlineData("db", "info")]
+    [InlineData("db", "upgrade")]
+    [InlineData("db info", "Saved TigerWrap database connection")]
+    [InlineData("db upgrade", "--backup-confirmed")]
+    [InlineData("db upgrade", "--sql-folder")]
+    public async Task DbCommandHelp_IsRegistered(string commandPath, string expectedText)
+    {
+        var app = TigerWrapApp.Build(CreateStore());
+
+        var result = await TigerCliAppTestHost
+            .For(app)
+            .WithArgs([.. commandPath.Split(' '), "--help"])
+            .RunAsync(CancellationToken.None);
+
+        Assert.Equal(0, result.ExitCode);
+        Assert.Contains(expectedText, result.StdOut);
+    }
+
+    [Fact]
+    public void DbCommands_UseProviderBackedConnectionSelection()
+    {
+        var infoConnection = GetArgument<DbInfoCommand.Settings>(nameof(DbInfoCommand.Settings.ConnectionName));
+        var upgradeConnection = GetArgument<DbUpgradeCommand.Settings>(nameof(DbUpgradeCommand.Settings.ConnectionName));
+        var backupConfirmed = GetOption<DbUpgradeCommand.Settings>(nameof(DbUpgradeCommand.Settings.BackupConfirmed));
+        var sqlFolder = GetOption<DbUpgradeCommand.Settings>(nameof(DbUpgradeCommand.Settings.SqlFolder));
+
+        Assert.Equal("connections", infoConnection.Provider);
+        Assert.True(infoConnection.AutoSelectSingleChoice);
+        Assert.Equal("connections", upgradeConnection.Provider);
+        Assert.True(upgradeConnection.AutoSelectSingleChoice);
+        Assert.Equal(TigerCliPromptable.No, backupConfirmed.Promptable);
+        Assert.Equal(TigerCliPromptable.No, sqlFolder.Promptable);
+    }
+
+    [Fact]
+    public void DbUpgrade_ActivitySpec_BuildsWithExpectedRows()
+    {
+        var spec = DbUpgradeCommand.CreateActivitySpec(new DbUpgradeCommand.Settings(), "TigerWrapDb");
+
+        Assert.NotNull(spec.GetRow("status"));
+        Assert.NotNull(spec.GetRow("batches"));
+        Assert.NotNull(spec.GetRow("issues"));
+        Assert.NotNull(spec.GetRow("elapsed"));
+        Assert.Contains("0.9.0", spec.NonInteractiveMessage);
+        Assert.Contains("0.9.1", spec.NonInteractiveMessage);
     }
 
     [Theory]

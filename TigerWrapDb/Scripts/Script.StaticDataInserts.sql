@@ -283,20 +283,20 @@ IF NOT EXISTS (SELECT 1 FROM [Enum].[TemplateType] WHERE [Id]=50)
 INSERT INTO [Enum].[TemplateType] ([Id], [Name]) 
 VALUES (50, N'WrapperEnumItem');
 
-IF NOT EXISTS (SELECT 1 FROM [Enum].[TemplateType] WHERE [Id]=51)
-INSERT INTO [Enum].[TemplateType] ([Id], [Name])
+IF NOT EXISTS (SELECT 1 FROM [Enum].[TemplateType] WHERE [Id]=51) 
+INSERT INTO [Enum].[TemplateType] ([Id], [Name]) 
 VALUES (51, N'StartClassBootstrap');
 
-IF NOT EXISTS (SELECT 1 FROM [Enum].[TemplateType] WHERE [Id]=52)
-INSERT INTO [Enum].[TemplateType] ([Id], [Name])
+IF NOT EXISTS (SELECT 1 FROM [Enum].[TemplateType] WHERE [Id]=52) 
+INSERT INTO [Enum].[TemplateType] ([Id], [Name]) 
 VALUES (52, N'EnumDescAttribute');
 
-IF NOT EXISTS (SELECT 1 FROM [Enum].[TemplateType] WHERE [Id]=53)
-INSERT INTO [Enum].[TemplateType] ([Id], [Name])
+IF NOT EXISTS (SELECT 1 FROM [Enum].[TemplateType] WHERE [Id]=53) 
+INSERT INTO [Enum].[TemplateType] ([Id], [Name]) 
 VALUES (53, N'EnumEntryDescAttribute');
 
-IF NOT EXISTS (SELECT 1 FROM [Enum].[TemplateType] WHERE [Id]=54)
-INSERT INTO [Enum].[TemplateType] ([Id], [Name])
+IF NOT EXISTS (SELECT 1 FROM [Enum].[TemplateType] WHERE [Id]=54) 
+INSERT INTO [Enum].[TemplateType] ([Id], [Name]) 
 VALUES (54, N'ExtraUsing');
 
 
@@ -716,6 +716,10 @@ IF NOT EXISTS (SELECT 1 FROM [Enum].[ToolkitResponseCode] WHERE [Id]=2008)
 INSERT INTO [Enum].[ToolkitResponseCode] ([Id], [Name], [Description], [IsSuccess]) 
 VALUES (2008, N'TigerCliUnhandledException', N'Unhandled exception', 0);
 
+IF NOT EXISTS (SELECT 1 FROM [Enum].[ToolkitResponseCode] WHERE [Id]=2009) 
+INSERT INTO [Enum].[ToolkitResponseCode] ([Id], [Name], [Description], [IsSuccess]) 
+VALUES (2009, N'TigerCliCancelled', N'Cancelled', 0);
+
 
 -- table [Enum].[CodePart]
 --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -772,4 +776,4 @@ VALUES (5, N'T', N'Trace');
 
 
 
--- Completion time: 2026-07-01T22:45:52.4108755+01:00
+-- Completion time: 2026-07-13T21:40:12.6472822+01:00

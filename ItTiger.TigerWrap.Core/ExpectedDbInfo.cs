@@ -4,6 +4,10 @@
     {
         public const string DbName = "TigerWrapDb";
 
+        // Schema version installed by the current release scripts.
+        // Must track TigerWrapDb/Scripts/Script.Version.sql.
+        public const string CurrentSchemaVersion = "0.9.1";
+
         // API level 2: description attribute support (new ProjectEnum/Project columns and
         // stored procedure parameters). The generated wrappers pass the new parameters, so
         // API level 1 databases are no longer usable by this tool version.

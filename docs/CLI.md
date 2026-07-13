@@ -14,7 +14,7 @@ To explore available commands:
 tiger-wrap --help
 ```
 
-This will list top-level command groups like `connections`, `projects`, and `generate-code`.
+This will list top-level command groups like `connections`, `db`, `projects`, and `generate-code`. Running `tiger-wrap` without arguments opens an interactive command menu.
 
 To see help for a specific command:
 
@@ -38,7 +38,7 @@ Most commands run in **interactive mode** by default, prompting for values.
 For scripting or automation, you can use the `--non-interactive` flag:
 
 ```bash
-tiger-wrap connections add MyConn --server . --db TigerWrapDb --auth Integrated --trust-server-cert Yes --non-interactive
+tiger-wrap connections add MyConn --server . --database TigerWrapDb --authentication Integrated --trust-server-certificate True --non-interactive
 ```
 
 ---
@@ -77,12 +77,16 @@ Once your TigerWrap database is installed, a typical CLI workflow looks like thi
 Add a connection to your **TigerWrapDb** metadata database:
 
 ```bash
-tiger-wrap connections add --name MyLocalTigerWrap --server . --auth Integrated
+tiger-wrap connections add MyLocalTigerWrap --server . --authentication Integrated
 ```
 
-This will prompt for:
-- Trust server certificate option
-- TigerWrap database (select your TigerWrapDb)
+This will prompt for the remaining options (encryption, trust server certificate, and the TigerWrap database — select your TigerWrapDb).
+
+You can verify the selected database at any time:
+
+```bash
+tiger-wrap db info MyLocalTigerWrap
+```
 
 ---
 
@@ -91,7 +95,7 @@ This will prompt for:
 Define a new code generation project:
 
 ```bash
-tiger-wrap projects add MyLocalTigerWrap TestDbProject   --language-name c#   --namespace MyCompany.MyTestApp   --class DbHelper
+tiger-wrap projects add MyLocalTigerWrap TestDbProject   --language CSharp   --namespace MyCompany.MyTestApp   --class DbHelper
 ```
 
 This defines how the generated C# code should be structured.
@@ -103,7 +107,7 @@ This defines how the generated C# code should be structured.
 Specify which stored procedures to include:
 
 ```bash
-tiger-wrap projects sp add MyLocalTigerWrap TestDbProject   --schema Oltp --nameMatch Prefix --namePattern User
+tiger-wrap projects sp add MyLocalTigerWrap TestDbProject   --schema Oltp --match Prefix --pattern User
 ```
 
 This will include all procedures starting with `User` from the `Oltp` schema.  
@@ -116,7 +120,7 @@ You can use other name matching methods like `ExactMatch`, `Suffix`, `Like`, or 
 If your application uses enum-style tables, you can map them:
 
 ```bash
-tiger-wrap projects enum add MyLocalTigerWrap TestDbProject   --schema Enum --nameMatch Any
+tiger-wrap projects enum add MyLocalTigerWrap TestDbProject   --schema Enum --name-match Any
 ```
 
 TigerWrap will generate corresponding C# enums.
@@ -125,7 +129,7 @@ Optionally, enums and enum members can be decorated with a description attribute
 (see [ENUMS.md](ENUMS.md) for details):
 
 ```bash
-tiger-wrap projects enum add MyLocalTigerWrap TestDbProject   --schema Enum --nameMatch Any   --description-column Description   --desc-attr-class DescriptionAttribute   --desc-attr-namespace System.ComponentModel
+tiger-wrap projects enum add MyLocalTigerWrap TestDbProject   --schema Enum --name-match Any   --description-column Description   --desc-attr-class DescriptionAttribute   --desc-attr-namespace System.ComponentModel
 ```
 
 Project-level defaults for the attribute class and namespace can be set with
@@ -143,6 +147,39 @@ tiger-wrap generate-code MyLocalTigerWrap TestDbProject
 ```
 
 This will analyze the database, apply your mappings, and output a `.cs` file with the generated code.
+
+---
+
+## 🩺 Managing the TigerWrap Database
+
+### Check version and compatibility
+
+```bash
+tiger-wrap db info
+```
+
+Shows the database type, schema version, API level, and whether the database is up to date, upgradable, or incompatible with your CLI version. It works even when the database is too old for the other commands.
+
+### Upgrade the database
+
+```bash
+tiger-wrap db upgrade
+```
+
+Upgrades a TigerWrapDb from `0.9.0` to `0.9.1` using the upgrade script shipped with the installer. The command:
+
+1. Verifies the database identity and current version
+2. Warns that **TigerWrap does not create a backup** and asks you to confirm one exists
+3. Runs the upgrade script with live progress (executed batches, warnings, elapsed time)
+4. Verifies the resulting version and API level
+
+For scripting, use `--non-interactive` together with `--backup-confirmed`:
+
+```bash
+tiger-wrap db upgrade MyLocalTigerWrap --backup-confirmed --non-interactive
+```
+
+Databases older than `0.9.0` must first be upgraded manually with the released scripts (see [INSTALL.md](./INSTALL.md)).
 
 ---
 

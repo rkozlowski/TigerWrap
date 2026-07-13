@@ -236,6 +236,7 @@
     <Build Include="Tables\Static.Template.sql" />
     <Build Include="Tables\Static.Number.sql" />
     <Build Include="Security\Static.sql" />
+    <None Include="Scripts\Compare.StaticParserData.sql" />
   </ItemGroup>
   <ItemGroup>
     <PostDeploy Include="Scripts\Script.PostDeployment.sql" />

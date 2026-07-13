@@ -59,7 +59,7 @@ TigerWrap generates wrapper classes based on your project settings (namespace, c
 Stored procedures are not discovered automatically. You must **explicitly add** them to a TigerWrap project using the CLI:
 
 ```bash
-tiger-wrap projects sp add <CONNECTION_NAME> <PROJECT_NAME> --schema Oltp --nameMatch Prefix --namePattern User
+tiger-wrap projects sp add <CONNECTION_NAME> <PROJECT_NAME> --schema Oltp --match Prefix --pattern User
 ```
 
 ### 🎯 Matching Methods
@@ -91,7 +91,7 @@ Stored procedures **can** be created in the `[dbo]` schema, but it is **strongly
 Adding all procedures in a schema to a TigerWrap project is simple:
 
 ```bash
-tiger-wrap projects sp add MyConn MyApp --schema Portal --nameMatch Any
+tiger-wrap projects sp add MyConn MyApp --schema Portal --match Any
 ```
 
 This ensures new procedures added in future releases are **automatically included** when code is regenerated.

@@ -1,4 +1,4 @@
-# 🛠 INSTALL.md — Installing TigerWrapDb (v0.9.0)
+# 🛠 INSTALL.md — Installing TigerWrapDb (v0.9.1)
 
 TigerWrap requires a dedicated SQL Server database to store its metadata, such as:
 - Project definitions
@@ -20,8 +20,8 @@ This database is called **TigerWrapDb**.
 | SQL Server version      | SQL Server 2017 or later                    |
 | Admin permissions       | You must be able to create schemas, types, etc. |
 | SQL Server Management Studio (SSMS) | Required to run the script with SQLCMD mode enabled |
-| CLI installer           | [Download TigerWrapSetup_0_9_0.exe](https://github.com/rkozlowski/TigerWrap/releases) |
-| Full deploy script      | [Download TigerWrapDb_FullDeploy_v_0.9.0.sql](https://github.com/rkozlowski/TigerWrap/releases) |
+| CLI installer           | [Download TigerWrapSetup_0_9_1.exe](https://github.com/rkozlowski/TigerWrap/releases) |
+| Full deploy script      | [Download TigerWrapDb_FullDeploy_v_0.9.1.sql](https://github.com/rkozlowski/TigerWrap/releases) |
 
 ---
 
@@ -43,7 +43,7 @@ You must create the database yourself. TigerWrap does **not** create it automati
 
 Get the latest version of:
 
-- [`TigerWrapDb_FullDeploy_v_0.9.0.sql`](https://github.com/rkozlowski/TigerWrap/releases)
+- [`TigerWrapDb_FullDeploy_v_0.9.1.sql`](https://github.com/rkozlowski/TigerWrap/releases)
 
 Place it in any working directory.
 
@@ -88,7 +88,16 @@ This will:
 
 ### 🔹 Step 6: Verify the Installation
 
-Run the following SQL to confirm installation and version:
+The easiest way is the TigerWrap CLI: add a connection to the new database and run
+
+```bash
+tiger-wrap connections add
+tiger-wrap db info
+```
+
+It shows the database type, schema version, API levels, and whether the database is compatible with (or upgradable by) your CLI version.
+
+Alternatively, run the following SQL to confirm installation and version:
 
 ```sql
 DECLARE @return_value INT,
@@ -111,7 +120,7 @@ SELECT @return_value AS [@return_value],
 ```
 
 #### Expected Output:
-- `@version` = `0.9.0`
+- `@version` = `0.9.1`
 - `@dbName` = **`TigerWrapDb`** ← *logical name, not actual database name*
 - API levels should reflect compatibility
 
@@ -146,11 +155,23 @@ SELECT @return_value AS [@return_value],
 
 ## 🧼 Upgrade Path
 
-If you're upgrading from a previous version (e.g. `v0.8.5`), use:
+### From v0.9.0 — use the CLI
+
+The CLI can upgrade a `0.9.0` database directly:
+
+```bash
+tiger-wrap db upgrade
+```
+
+It verifies the database, warns you that **no backup is created** (make one first!), asks for confirmation, runs the packaged upgrade script, and verifies the result. Use `tiger-wrap db info` at any time to check the current version and upgrade availability.
+
+### From older versions — run the scripts manually
+
+For versions before `0.9.0` (e.g. `v0.8.5`), apply the released upgrade scripts in order using SSMS:
 
 - [`TigerWrapDb_Upgrade_v_0.8.5_to_0.9.0.sql`](https://github.com/rkozlowski/TigerWrap/releases)
 
-Follow the same rules: edit `:setvar`, enable SQLCMD mode, run script.
+Follow the same rules as installation: edit `:setvar`, enable SQLCMD mode, run script. Then use `tiger-wrap db upgrade` for the final `0.9.0` → `0.9.1` step.
 
 ---
 

@@ -4,6 +4,9 @@ using ItTiger.TigerWrap.Cli.Commands;
 
 namespace ItTiger.TigerWrap.Tests;
 
+// Redirects Console.Out and mutates TigerConsole state; must not run in
+// parallel with other tests that write console output.
+[Collection("TigerCli app tests")]
 public sealed class GenerateCodeCommandTests
 {
     [Theory]
