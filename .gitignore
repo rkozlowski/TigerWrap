@@ -402,3 +402,4 @@ FodyWeavers.xsd
 ItTiger.TigerWrap.Installer/WorkingDir/
 ItTiger.TigerWrap.Installer/Output/
 /.antigravitycli
+/.internal
