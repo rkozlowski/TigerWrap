@@ -18,14 +18,11 @@ public sealed class ProjectsListSettings : TigerCliSettings
         AutoSelectSingleChoice = true)]
     public string ConnectionName { get; set; } = string.Empty;
 
-    [TigerCliOption("--language-id", Description = "Filter by language id.")]
-    public int? LanguageId { get; set; }
-
-    [TigerCliOption("--language-code", Description = "Filter by language code.")]
-    public string? LanguageCode { get; set; }
-
-    [TigerCliOption("--language-name", Description = "Filter by language name.")]
-    public string? LanguageName { get; set; }
+    [TigerCliOption("--language",
+        Provider = "languages",
+        Promptable = TigerCliPromptable.No,        
+        Description = "Filter by language.")]
+    public ToolkitDbHelper.Language? Language { get; set; }
 }
 
 public sealed class ProjectsListCommand(SqlServerConnectionStore connectionStore)
@@ -44,14 +41,7 @@ public sealed class ProjectsListCommand(SqlServerConnectionStore connectionStore
 
         try
         {
-            var languageId = await ResolveLanguageIdAsync(db, settings);
-            if (languageId.Error is not null)
-            {
-                TigerConsole.MarkupErrorLine(settings.E("{0}", languageId.Error));
-                return (int)ToolkitDbHelper.ToolkitResponseCode.CliInvalidArguments;
-            }
-
-            var projects = await db.GetProjectsAsync((ToolkitDbHelper.Language?)languageId.Value);
+            var projects = await db.GetProjectsAsync(settings.Language);
             if (!projects.Any())
             {
                 TigerConsole.MarkupLine(settings.T("[Muted]No projects found.[/]"));
@@ -88,31 +78,5 @@ public sealed class ProjectsListCommand(SqlServerConnectionStore connectionStore
             TigerConsole.MarkupErrorLine(settings.E("{0}", ex.Message));
             return (int)ToolkitDbHelper.ToolkitResponseCode.CliUnhandledException;
         }
-    }
-
-    private static async Task<(byte? Value, string? Error)> ResolveLanguageIdAsync(
-        ToolkitDbHelper db,
-        ProjectsListSettings settings)
-    {
-        if (settings.LanguageId.HasValue)
-            return ((byte)settings.LanguageId.Value, null);
-
-        if (!string.IsNullOrWhiteSpace(settings.LanguageCode))
-        {
-            var id = await ToolkitHelper.GetLanguageIdByCodeAsync(db, settings.LanguageCode);
-            return id is null
-                ? (null, $"Unknown language code: '{settings.LanguageCode}'")
-                : (id, null);
-        }
-
-        if (!string.IsNullOrWhiteSpace(settings.LanguageName))
-        {
-            var id = await ToolkitHelper.GetLanguageIdByNameAsync(db, settings.LanguageName);
-            return id is null
-                ? (null, $"Unknown language name: '{settings.LanguageName}'")
-                : (id, null);
-        }
-
-        return (null, null);
     }
 }

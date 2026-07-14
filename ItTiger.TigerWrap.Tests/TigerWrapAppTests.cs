@@ -28,10 +28,10 @@ public sealed class TigerWrapAppTests
             .RunAsync(CancellationToken.None);
 
         Assert.Equal(0, result.ExitCode);
-        Assert.Contains("connections", result.StdOut);
+        Assert.Contains("connection", result.StdOut);
         Assert.Contains("languages-list", result.StdOut);
         Assert.Contains("generate-code", result.StdOut);
-        Assert.Contains("projects", result.StdOut);
+        Assert.Contains("project", result.StdOut);
     }
 
     [Fact]
@@ -99,21 +99,21 @@ public sealed class TigerWrapAppTests
 
     [Theory]
     [InlineData("languages-list", "Saved TigerWrap database connection")]
-    [InlineData("projects", "list")]
-    [InlineData("projects list", "language-code")]
-    [InlineData("projects show", "Project name")]
-    [InlineData("projects add", "--language")]
-    [InlineData("projects add", "--desc-attr-class")]
-    [InlineData("projects update", "--new-name")]
-    [InlineData("projects update", "--desc-attr-namespace")]
-    [InlineData("projects sp add", "--langopt-reset")]
-    [InlineData("projects sp remove", "Stored procedure mapping ID")]
-    [InlineData("projects enum add", "--name-match")]
-    [InlineData("projects enum add", "--description-column")]
-    [InlineData("projects enum add", "--desc-attr-class")]
-    [InlineData("projects enum remove", "Enum mapping ID")]
-    [InlineData("projects norm add", "--name-part")]
-    [InlineData("projects norm remove", "Normalization ID")]
+    [InlineData("project", "list")]
+    [InlineData("project list", "--language")]
+    [InlineData("project show", "Project name")]
+    [InlineData("project add", "--language")]
+    [InlineData("project add", "--desc-attr-class")]
+    [InlineData("project update", "--new-name")]
+    [InlineData("project update", "--desc-attr-namespace")]
+    [InlineData("project sp add", "--langopt-reset")]
+    [InlineData("project sp remove", "Stored procedure mapping ID")]
+    [InlineData("project enum add", "--name-match")]
+    [InlineData("project enum add", "--description-column")]
+    [InlineData("project enum add", "--desc-attr-class")]
+    [InlineData("project enum remove", "Enum mapping ID")]
+    [InlineData("project norm add", "--name-part")]
+    [InlineData("project norm remove", "Normalization ID")]
     [InlineData("generate-code", "--output-type")]
     public async Task CommandHelp_IsRegistered(string commandPath, string expectedText)
     {
@@ -135,7 +135,7 @@ public sealed class TigerWrapAppTests
 
         var result = await TigerCliAppTestHost
             .For(app)
-            .WithArgs("projects", "--help")
+            .WithArgs("project", "--help")
             .RunAsync(CancellationToken.None);
 
         Assert.Equal(0, result.ExitCode);
@@ -149,9 +149,9 @@ public sealed class TigerWrapAppTests
     }
 
     [Theory]
-    [InlineData("projects sp", "Manage project stored procedure mappings")]
-    [InlineData("projects enum", "Manage project enum mappings")]
-    [InlineData("projects norm", "Manage project name normalizations")]
+    [InlineData("project sp", "Manage project stored procedure mappings")]
+    [InlineData("project enum", "Manage project enum mappings")]
+    [InlineData("project norm", "Manage project name normalizations")]
     public async Task ProjectSubResourceGroupHelp_ListsAddAndRemoveChildren(string commandPath, string expectedDescription)
     {
         var app = TigerWrapApp.Build(CreateStore());
@@ -198,6 +198,19 @@ public sealed class TigerWrapAppTests
 
         Assert.Equal("language-options", languageOptions.Provider);
         Assert.NotNull(GetMultiSelect<ProjectsAddCommand.Settings>(nameof(ProjectsAddCommand.Settings.LanguageOptions)));
+    }
+
+    [Fact]
+    public void ProjectsList_UsesSingleProviderBackedLanguageSelector()
+    {
+        var language = GetOption<ProjectsListSettings>(nameof(ProjectsListSettings.Language));
+
+        Assert.Equal("--language", language.Aliases.Single());
+        Assert.Equal("languages", language.Provider);
+        Assert.True(language.AutoSelectSingleChoice);
+        Assert.Null(typeof(ProjectsListSettings).GetProperty("LanguageId"));
+        Assert.Null(typeof(ProjectsListSettings).GetProperty("LanguageCode"));
+        Assert.Null(typeof(ProjectsListSettings).GetProperty("LanguageName"));
     }
 
     [Fact]
@@ -366,7 +379,7 @@ public sealed class TigerWrapAppTests
 
         var result = await TigerCliAppTestHost
             .For(app)
-            .WithArgs("projects", "list", "dev", "--definitely-not-an-option", "--non-interactive")
+            .WithArgs("project", "list", "dev", "--definitely-not-an-option", "--non-interactive")
             .RunAsync(CancellationToken.None);
 
         Assert.Equal((int)ToolkitResponseCode.TigerCliInvalidArguments, result.ExitCode);
@@ -392,7 +405,7 @@ public sealed class TigerWrapAppTests
 
         var result = await TigerCliAppTestHost
             .For(app)
-            .WithArgs("connections", "--help")
+            .WithArgs("connection", "--help")
             .RunAsync(CancellationToken.None);
 
         Assert.Equal(0, result.ExitCode);
@@ -412,7 +425,7 @@ public sealed class TigerWrapAppTests
         var result = await TigerCliAppTestHost
             .For(app)
             .WithArgs(
-                "connections",
+                "connection",
                 "add",
                 "local",
                 "--server",
@@ -443,7 +456,7 @@ public sealed class TigerWrapAppTests
         var result = await TigerCliAppTestHost
             .For(app)
             .WithArgs(
-                "connections",
+                "connection",
                 "add",
                 "missing-db",
                 "--server",

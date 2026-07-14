@@ -14,7 +14,7 @@ To explore available commands:
 tiger-wrap --help
 ```
 
-This will list top-level command groups like `connections`, `db`, `projects`, and `generate-code`. Running `tiger-wrap` without arguments opens an interactive command menu.
+This will list top-level command groups like `connection`, `db`, `project`, and `generate-code`. Running `tiger-wrap` without arguments opens an interactive command menu.
 
 To see help for a specific command:
 
@@ -25,8 +25,8 @@ tiger-wrap <command> --help
 Examples:
 
 ```bash
-tiger-wrap connections add --help
-tiger-wrap projects sp add --help
+tiger-wrap connection add --help
+tiger-wrap project sp add --help
 ```
 
 ---
@@ -38,7 +38,7 @@ Most commands run in **interactive mode** by default, prompting for values.
 For scripting or automation, you can use the `--non-interactive` flag:
 
 ```bash
-tiger-wrap connections add MyConn --server . --database TigerWrapDb --authentication Integrated --trust-server-certificate True --non-interactive
+tiger-wrap connection add MyConn --server . --database TigerWrapDb --authentication Integrated --trust-server-certificate True --non-interactive
 ```
 
 ---
@@ -77,7 +77,7 @@ Once your TigerWrap database is installed, a typical CLI workflow looks like thi
 Add a connection to your **TigerWrapDb** metadata database:
 
 ```bash
-tiger-wrap connections add MyLocalTigerWrap --server . --authentication Integrated
+tiger-wrap connection add MyLocalTigerWrap --server . --authentication Integrated
 ```
 
 This will prompt for the remaining options (encryption, trust server certificate, and the TigerWrap database — select your TigerWrapDb).
@@ -95,7 +95,7 @@ tiger-wrap db info MyLocalTigerWrap
 Define a new code generation project:
 
 ```bash
-tiger-wrap projects add MyLocalTigerWrap TestDbProject   --language CSharp   --namespace MyCompany.MyTestApp   --class DbHelper
+tiger-wrap project add MyLocalTigerWrap TestDbProject   --language CSharp   --namespace MyCompany.MyTestApp   --class DbHelper
 ```
 
 This defines how the generated C# code should be structured.
@@ -107,7 +107,7 @@ This defines how the generated C# code should be structured.
 Specify which stored procedures to include:
 
 ```bash
-tiger-wrap projects sp add MyLocalTigerWrap TestDbProject   --schema Oltp --match Prefix --pattern User
+tiger-wrap project sp add MyLocalTigerWrap TestDbProject   --schema Oltp --match Prefix --pattern User
 ```
 
 This will include all procedures starting with `User` from the `Oltp` schema.  
@@ -120,7 +120,7 @@ You can use other name matching methods like `ExactMatch`, `Suffix`, `Like`, or 
 If your application uses enum-style tables, you can map them:
 
 ```bash
-tiger-wrap projects enum add MyLocalTigerWrap TestDbProject   --schema Enum --name-match Any
+tiger-wrap project enum add MyLocalTigerWrap TestDbProject   --schema Enum --name-match Any
 ```
 
 TigerWrap will generate corresponding C# enums.
@@ -129,11 +129,11 @@ Optionally, enums and enum members can be decorated with a description attribute
 (see [ENUMS.md](ENUMS.md) for details):
 
 ```bash
-tiger-wrap projects enum add MyLocalTigerWrap TestDbProject   --schema Enum --name-match Any   --description-column Description   --desc-attr-class DescriptionAttribute   --desc-attr-namespace System.ComponentModel
+tiger-wrap project enum add MyLocalTigerWrap TestDbProject   --schema Enum --name-match Any   --description-column Description   --desc-attr-class DescriptionAttribute   --desc-attr-namespace System.ComponentModel
 ```
 
 Project-level defaults for the attribute class and namespace can be set with
-`tiger-wrap projects add/update --desc-attr-class ... --desc-attr-namespace ...`;
+`tiger-wrap project add/update --desc-attr-class ... --desc-attr-namespace ...`;
 mapping-level values override them.
 
 ---

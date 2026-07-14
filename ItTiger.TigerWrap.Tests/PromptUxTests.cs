@@ -29,7 +29,7 @@ public sealed class PromptUxTests
             "Update ExpectedDbInfo when the schema API level changes.");
     }
 
-    // Interactive `projects sp add` used to be impossible to complete for non-LIKE
+    // Interactive `project sp add` used to be impossible to complete for non-LIKE
     // matches: the esc-char prompt bound Enter as an empty string, which the stored
     // procedure rejects ("Unexpected escape character"). The pattern/esc-char prompts
     // are now gated on the selected match type.

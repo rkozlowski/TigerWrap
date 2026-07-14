@@ -102,7 +102,7 @@ INSERT INTO [Enum].[UserType] (Id, Code) VALUES
 Corresponding enum mapping:
 
 ```
-tiger-wrap projects enum add --schema Enum --name-match ExactMatch --name-pattern UserType --name-column Code
+tiger-wrap project enum add --schema Enum --name-match ExactMatch --name-pattern UserType --name-column Code
 ```
 
 Generated C# enum:
@@ -123,8 +123,8 @@ TigerWrap can decorate generated enums and enum members with a description attri
 `[TigerText("Some text")]`. Only the basic single-string-argument constructor form is supported.
 
 - The attribute class name and namespace can be configured per project
-  (`tiger-wrap projects add/update --desc-attr-class ... --desc-attr-namespace ...`) and
-  overridden per enum mapping (`tiger-wrap projects enum add --desc-attr-class ... --desc-attr-namespace ...`).
+  (`tiger-wrap project add/update --desc-attr-class ... --desc-attr-namespace ...`) and
+  overridden per enum mapping (`tiger-wrap project enum add --desc-attr-class ... --desc-attr-namespace ...`).
   A mapping-level value takes precedence over the project-level value.
 - `--description` on an enum mapping sets static text emitted as an attribute on each matched enum type.
 - `--description-column` on an enum mapping names a column in the source enum table whose values are
@@ -134,7 +134,7 @@ TigerWrap can decorate generated enums and enum members with a description attri
   generated output is unchanged. The configured namespace is added as a `using` directive when needed.
 
 ```
-tiger-wrap projects enum add --schema Enum --name-match ExactMatch --name-pattern UserType --name-column Code \
+tiger-wrap project enum add --schema Enum --name-match ExactMatch --name-pattern UserType --name-column Code \
     --description-column Description --desc-attr-class DescriptionAttribute --desc-attr-namespace System.ComponentModel
 ```
 

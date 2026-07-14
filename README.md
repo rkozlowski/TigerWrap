@@ -35,10 +35,10 @@ TigerWrap does **not** abstract away SQL. It doesn’t try to “save” you fro
 ## 🚀 Quickstart
 
 ```bash
-tiger-wrap connections add
+tiger-wrap connection add
 tiger-wrap db info
-tiger-wrap projects add
-tiger-wrap projects sp add
+tiger-wrap project add
+tiger-wrap project sp add
 tiger-wrap generate-code
 ```
 

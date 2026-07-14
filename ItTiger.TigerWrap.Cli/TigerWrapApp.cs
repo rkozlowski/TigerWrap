@@ -42,7 +42,7 @@ internal static class TigerWrapApp
                 providers.Add(
                     "connections",
                     ctx => connectionStore.GetConnectionNamesAsync(ctx.CancellationToken)))
-            .AddCommandGroup("connections", group =>
+            .AddCommandGroup("connection", group =>
             {
                 group.SetDescription("Manage TigerWrap database connections.");
                 SqlServerConnectionCommands.Configure(group, options =>
@@ -75,7 +75,7 @@ internal static class TigerWrapApp
                     .SetPromptMode(TigerCliPromptMode.RequiredOnly)
                     .CommandMenu(CommandMenuMode.Disabled),
                 "Generate code for a TigerWrap project.")
-            .AddCommandGroup("projects", group =>
+            .AddCommandGroup("project", group =>
             {
                 group.SetDescription("View and manage TigerWrap projects.");
                 group.AddAsyncProvider<string>(
@@ -85,6 +85,10 @@ internal static class TigerWrapApp
                 group.AddCommand(
                     "list",
                     () => new ProjectsListCommand(connectionStore),
+                    command => command.AddAsyncProvider<ToolkitDbHelper.Language>(
+                        "languages",
+                        ctx => ProjectCommandProviders.GetLanguageChoicesAsync(connectionStore, ctx),
+                        configure: options => options.EmptyMessage("No languages were found for the selected connection.")),
                     "List projects.");
                 group.AddCommand(
                     "show",

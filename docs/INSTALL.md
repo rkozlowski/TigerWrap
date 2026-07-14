@@ -119,7 +119,7 @@ This will:
 The easiest way is the TigerWrap CLI: add a connection to the new database and run
 
 ```bash
-tiger-wrap connections add
+tiger-wrap connection add
 tiger-wrap db info
 ```
 
@@ -208,9 +208,9 @@ Follow the same rules as installation: edit `:setvar`, enable SQLCMD mode, run s
 Once installed, you can begin using the TigerWrap CLI:
 
 ```bash
-tiger-wrap connections add
-tiger-wrap projects add
-tiger-wrap projects sp add
+tiger-wrap connection add
+tiger-wrap project add
+tiger-wrap project sp add
 tiger-wrap generate-code
 ```
 
