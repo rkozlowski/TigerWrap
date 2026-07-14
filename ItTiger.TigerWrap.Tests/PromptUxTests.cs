@@ -38,11 +38,13 @@ public sealed class PromptUxTests
     {
         var pattern = GetOption<ProjectsSpAddCommand.Settings>(nameof(ProjectsSpAddCommand.Settings.Pattern));
         var escChar = GetOption<ProjectsSpAddCommand.Settings>(nameof(ProjectsSpAddCommand.Settings.EscChar));
+        var promptWhenValueNotIn = Assert.IsType<string[]>(pattern.PromptWhenValueNotIn);
+        var requiredWhenValueNotIn = Assert.IsType<string[]>(pattern.RequiredWhenValueNotIn);
 
         Assert.Equal("--match", pattern.PromptWhenOption);
-        Assert.Equal(["Any"], pattern.PromptWhenValueNotIn);
+        Assert.Equal(["Any"], promptWhenValueNotIn);
         Assert.Equal("--match", pattern.RequiredWhenOption);
-        Assert.Equal(["Any"], pattern.RequiredWhenValueNotIn);
+        Assert.Equal(["Any"], requiredWhenValueNotIn);
 
         Assert.Equal("--match", escChar.PromptWhenOption);
         Assert.Equal(nameof(ToolkitDbHelper.NameMatch.Like), escChar.PromptWhenValue);
@@ -53,11 +55,13 @@ public sealed class PromptUxTests
     {
         var pattern = GetOption<ProjectsEnumAddCommand.Settings>(nameof(ProjectsEnumAddCommand.Settings.NamePattern));
         var escChar = GetOption<ProjectsEnumAddCommand.Settings>(nameof(ProjectsEnumAddCommand.Settings.EscChar));
+        var promptWhenValueNotIn = Assert.IsType<string[]>(pattern.PromptWhenValueNotIn);
+        var requiredWhenValueNotIn = Assert.IsType<string[]>(pattern.RequiredWhenValueNotIn);
 
         Assert.Equal("--name-match", pattern.PromptWhenOption);
-        Assert.Equal(["Any"], pattern.PromptWhenValueNotIn);
+        Assert.Equal(["Any"], promptWhenValueNotIn);
         Assert.Equal("--name-match", pattern.RequiredWhenOption);
-        Assert.Equal(["Any"], pattern.RequiredWhenValueNotIn);
+        Assert.Equal(["Any"], requiredWhenValueNotIn);
 
         Assert.Equal("--name-match", escChar.PromptWhenOption);
         Assert.Equal(nameof(ToolkitDbHelper.NameMatch.Like), escChar.PromptWhenValue);

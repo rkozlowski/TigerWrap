@@ -71,7 +71,7 @@ public sealed class GenerateCodeCommandTests
 
         var summary = await GenerateCodeCommand.WriteGeneratedFileAsync(file, content);
 
-        Assert.Equal(content, await File.ReadAllTextAsync(file));
+        Assert.Equal(content, await File.ReadAllTextAsync(file, TestContext.Current.CancellationToken));
         Assert.Equal("Generated.cs", summary.FileName);
         Assert.Equal(2, summary.Lines);
         Assert.Equal(new FileInfo(file).Length, summary.Bytes);

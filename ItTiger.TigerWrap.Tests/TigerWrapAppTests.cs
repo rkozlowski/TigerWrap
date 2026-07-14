@@ -207,7 +207,8 @@ public sealed class TigerWrapAppTests
 
         Assert.Equal("--language", language.Aliases.Single());
         Assert.Equal("languages", language.Provider);
-        Assert.True(language.AutoSelectSingleChoice);
+        Assert.False(language.Required);
+        Assert.Equal(TigerCliPromptable.No, language.Promptable);
         Assert.Null(typeof(ProjectsListSettings).GetProperty("LanguageId"));
         Assert.Null(typeof(ProjectsListSettings).GetProperty("LanguageCode"));
         Assert.Null(typeof(ProjectsListSettings).GetProperty("LanguageName"));
