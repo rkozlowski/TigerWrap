@@ -62,16 +62,11 @@ Write-Host "Updating Installer.iss..."
 
 # Step 7: Locate ISCC.exe from registry
 Write-Host "Resolving Inno Setup Compiler (ISCC.exe)..."
-$innoKey = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\Inno Setup 6_is1"
+$innoKey = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\Inno Setup 7_is1"
 $innoPath = (Get-ItemProperty -Path $innoKey -ErrorAction SilentlyContinue).InstallLocation
 
-if (-not $innoPath) {
-    $innoKey32 = "HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\Inno Setup 6_is1"
-    $innoPath = (Get-ItemProperty -Path $innoKey32 -ErrorAction SilentlyContinue).InstallLocation
-}
-
 if (-not $innoPath -or !(Test-Path "$innoPath\ISCC.exe")) {
-    throw "Inno Setup Compiler (ISCC.exe) not found. Please install Inno Setup 6."
+    throw "Inno Setup Compiler (ISCC.exe) not found. Please install Inno Setup 7."
 }
 
 $innoSetupExe = Join-Path $innoPath "ISCC.exe"

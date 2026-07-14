@@ -1,6 +1,6 @@
 ; ============================================
 ; TigerWrap Installer Script
-; Version:     0.9.0
+; Version:     0.9.1
 ; InstallType: Machine-wide (admin required)
 ; Author:      IT Tiger
 ; ============================================
@@ -13,17 +13,17 @@
 ; It equals the previously implicit default (AppName) and must never change.
 AppId=TigerWrap CLI
 AppName=TigerWrap CLI
-AppVersion=0.9.0
+AppVersion=0.9.1
 DefaultDirName={autopf}\ItTiger\TigerWrap
 DefaultGroupName=TigerWrap
-OutputBaseFilename=TigerWrapSetup_0_9_0
+OutputBaseFilename=TigerWrapSetup_0_9_1
 Compression=lzma
 SolidCompression=yes
 ArchitecturesInstallIn64BitMode=x64compatible
 PrivilegesRequired=admin
 DisableProgramGroupPage=yes
 VersionInfoDescription=TigerWrap CLI installer
-VersionInfoVersion=0.9.0.0
+VersionInfoVersion=0.9.1.0
 UninstallDisplayIcon={app}\cli\tiger-wrap.exe
 AlwaysShowDirOnReadyPage=yes
 
