@@ -30,15 +30,15 @@ public sealed class ProjectsNormAddCommand(SqlServerConnectionStore connectionSt
             MinLength = 1)]
         public string ProjectName { get; set; } = string.Empty;
 
+        [TigerCliOption("--type", Required = true, Promptable = TigerCliPromptable.Normal, Description = "Name part type.")]
+        public ToolkitDbHelper.NamePartType? NamePartTypeId { get; set; }
+
         [TigerCliOption("--name-part",
             Required = true,
-            Promptable = TigerCliPromptable.Normal,
+            Promptable = TigerCliPromptable.Last,
             MinLength = 1,
             Description = "Name part to normalize.")]
         public string NamePart { get; set; } = string.Empty;
-
-        [TigerCliOption("--type", Required = true, Promptable = TigerCliPromptable.Normal, Description = "Name part type.")]
-        public ToolkitDbHelper.NamePartType? NamePartTypeId { get; set; }
     }
 
     public override async Task<int> ExecuteAsync(Settings settings)
