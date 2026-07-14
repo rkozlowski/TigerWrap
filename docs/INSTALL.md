@@ -21,7 +21,35 @@ This database is called **TigerWrapDb**.
 | Admin permissions       | You must be able to create schemas, types, etc. |
 | SQL Server Management Studio (SSMS) | Required to run the script with SQLCMD mode enabled |
 | CLI installer           | [Download TigerWrapSetup_0_9_1.exe](https://github.com/rkozlowski/TigerWrap/releases) |
+| .NET runtime            | Microsoft .NET 10 Runtime (x64) — see [CLI prerequisites](#-cli-prerequisites-net-runtime) |
 | Full deploy script      | [Download TigerWrapDb_FullDeploy_v_0.9.1.sql](https://github.com/rkozlowski/TigerWrap/releases) |
+
+---
+
+## 💻 CLI Prerequisites: .NET Runtime
+
+The TigerWrap CLI is **framework-dependent**: it does not bundle .NET and requires the
+**Microsoft .NET 10 Runtime (x64)** (`Microsoft.NETCore.App`, any 10.0.x servicing release).
+The plain console runtime is enough — the Desktop or ASP.NET Core runtimes are not needed.
+
+The setup wizard checks for the runtime before installing:
+
+- **Runtime present** — installation continues normally, no extra prompts.
+- **Runtime missing (interactive)** — Setup offers to download the latest .NET 10 runtime
+  installer directly from Microsoft (`aka.ms`) and run it. You can also cancel Setup and
+  install the runtime yourself from
+  [dotnet.microsoft.com/download/dotnet/10.0](https://dotnet.microsoft.com/download/dotnet/10.0).
+- **Runtime missing (silent install, `/SILENT` or `/VERYSILENT`)** — Setup does **not**
+  download anything on its own. It logs a clear prerequisite error and exits with exit
+  code 1 before installing anything. To allow the silent install to fetch and install
+  the runtime from Microsoft, pass the explicit option:
+
+  ```bash
+  TigerWrapSetup_0_9_1.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /INSTALLDOTNET
+  ```
+
+- **winget** — the winget package declares a dependency on `Microsoft.DotNet.Runtime.10`,
+  so winget installs the runtime first when needed; the installer's own check then passes.
 
 ---
 
