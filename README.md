@@ -47,12 +47,28 @@ For details, see [docs/CLI.md](docs/CLI.md).
 
 ---
 
-## 📦 Installation
+## 📦 Installation and Updates
 
-1. Install the TigerWrap database (TigerWrapDb)  
-2. Download and run the [TigerWrap CLI Installer](https://github.com/rkozlowski/TigerWrap/releases)
+WinGet is the preferred way to install and update the TigerWrap CLI:
 
-See [docs/INSTALL.md](docs/INSTALL.md) for full instructions.
+```bash
+winget install ItTiger.TigerWrap
+winget upgrade ItTiger.TigerWrap
+```
+
+The package ID is `ItTiger.TigerWrap`, and its moniker is `tiger-wrap`.
+`winget update --all` can also update TigerWrap; this has been verified when moving
+from a manually installed TigerWrap 0.9.0 to the WinGet-distributed 0.9.1 package.
+
+GitHub releases may be available before the corresponding WinGet update completes
+review and publication. If you need the newest release immediately, download its
+installer from [GitHub Releases](https://github.com/rkozlowski/TigerWrap/releases).
+WinGet remains the preferred normal installation and update path.
+
+The CLI and TigerWrapDb have related, but separate, versions. After updating the CLI,
+run `tiger-wrap db info` and upgrade the database if required. See
+[docs/INSTALL.md](docs/INSTALL.md) for database setup, compatibility, backup, and
+upgrade instructions.
 
 ---
 
@@ -62,7 +78,7 @@ See [docs/INSTALL.md](docs/INSTALL.md) for full instructions.
 - [docs/ENUMS.md](docs/ENUMS.md) — enum mapping guide  
 - [docs/WRAPPERS.md](docs/WRAPPERS.md) — stored procedure wrappers  
 - [docs/CLI.md](docs/CLI.md) — CLI usage  
-- [docs/INSTALL.md](docs/INSTALL.md) — database setup  
+- [docs/INSTALL.md](docs/INSTALL.md) — CLI installation and database setup
 
 ---
 

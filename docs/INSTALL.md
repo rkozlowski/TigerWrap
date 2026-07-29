@@ -20,9 +20,43 @@ This database is called **TigerWrapDb**.
 | SQL Server version      | SQL Server 2017 or later                    |
 | Admin permissions       | You must be able to create schemas, types, etc. |
 | SQL Server Management Studio (SSMS) | Required to run the script with SQLCMD mode enabled |
-| CLI installer           | [Download TigerWrapSetup_0_9_1.exe](https://github.com/rkozlowski/TigerWrap/releases) |
+| CLI                     | Install with WinGet (preferred) or the [GitHub release installer](https://github.com/rkozlowski/TigerWrap/releases) |
 | .NET runtime            | Microsoft .NET 10 Runtime (x64) — see [CLI prerequisites](#-cli-prerequisites-net-runtime) |
 | Full deploy script      | [Download TigerWrapDb_FullDeploy_v_0.9.1.sql](https://github.com/rkozlowski/TigerWrap/releases) |
+
+---
+
+## 📦 Install and Update the CLI
+
+WinGet is the preferred installation and update method because it provides the
+simplest supported path.
+
+Install TigerWrap:
+
+```bash
+winget install ItTiger.TigerWrap
+```
+
+Update TigerWrap:
+
+```bash
+winget upgrade ItTiger.TigerWrap
+```
+
+The WinGet package ID is `ItTiger.TigerWrap`, and its moniker is `tiger-wrap`.
+The general update command can also update TigerWrap:
+
+```bash
+winget update --all
+```
+
+This was verified when updating a machine with TigerWrap 0.9.0 installed manually,
+outside WinGet, to the WinGet-distributed 0.9.1 package.
+
+GitHub releases may appear before the corresponding WinGet package update completes
+review and publication. If you need the newest release immediately, use the installer
+from [GitHub Releases](https://github.com/rkozlowski/TigerWrap/releases). WinGet
+remains the preferred normal installation and update path.
 
 ---
 
@@ -181,17 +215,34 @@ SELECT @return_value AS [@return_value],
 
 ---
 
-## 🧼 Upgrade Path
+## 🧼 Database Compatibility and Upgrade Path
 
-### From v0.9.0 — use the CLI
+The TigerWrap CLI and TigerWrapDb versions are related, but updating the CLI does
+not automatically upgrade TigerWrapDb. TigerWrap 0.9.1 supports TigerWrapDb API
+level 2.
 
-The CLI can upgrade a `0.9.0` database directly:
+After updating the CLI, inspect each TigerWrapDb connection:
+
+```bash
+tiger-wrap db info
+```
+
+If it reports that the `0.9.0` → `0.9.1` upgrade is available, create a current
+database backup before continuing, then run:
 
 ```bash
 tiger-wrap db upgrade
 ```
 
-It verifies the database, warns you that **no backup is created** (make one first!), asks for confirmation, runs the packaged upgrade script, and verifies the result. Use `tiger-wrap db info` at any time to check the current version and upgrade availability.
+Normal commands that require API level 2 will not work with an older, incompatible
+database until it is upgraded. TigerWrap does not create a backup and cannot
+automatically roll back a failed database upgrade.
+
+### From v0.9.0 — use the CLI
+
+The supported automatic upgrade path in TigerWrap 0.9.1 is TigerWrapDb `0.9.0` →
+`0.9.1`. The CLI verifies the database, requires backup confirmation, runs the
+packaged upgrade script, and verifies the result.
 
 ### From older versions — run the scripts manually
 
