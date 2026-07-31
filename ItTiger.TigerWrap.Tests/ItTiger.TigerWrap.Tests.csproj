@@ -12,12 +12,12 @@
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
-    <PackageReference Include="ItTiger.Core" Version="0.8.0" />
-    <PackageReference Include="ItTiger.TigerCli" Version="0.8.0" />
-    <PackageReference Include="ItTiger.TigerQuery" Version="0.8.1" />
-    <PackageReference Include="ItTiger.TigerQuery.CliCore" Version="0.8.1" />
-    <PackageReference Include="ItTiger.TigerQuery.Core" Version="0.8.1" />
-    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.7.0" />
+    <PackageReference Include="ItTiger.Core" Version="0.8.1" />
+    <PackageReference Include="ItTiger.TigerCli" Version="0.8.1" />
+    <PackageReference Include="ItTiger.TigerQuery" Version="0.8.2" />
+    <PackageReference Include="ItTiger.TigerQuery.CliCore" Version="0.8.2" />
+    <PackageReference Include="ItTiger.TigerQuery.Core" Version="0.8.2" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.8.1" />
     <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>

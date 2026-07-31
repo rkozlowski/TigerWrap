@@ -9,11 +9,11 @@
 
   <ItemGroup>
     <PackageReference Include="Dapper" Version="2.1.79" />
-    <PackageReference Include="ItTiger.Core" Version="0.8.0" />
-    <PackageReference Include="ItTiger.TigerQuery" Version="0.8.1" />
-    <PackageReference Include="ItTiger.TigerQuery.Core" Version="0.8.1" />
+    <PackageReference Include="ItTiger.Core" Version="0.8.1" />
+    <PackageReference Include="ItTiger.TigerQuery" Version="0.8.2" />
+    <PackageReference Include="ItTiger.TigerQuery.Core" Version="0.8.2" />
     <PackageReference Include="Microsoft.Data.SqlClient" Version="7.0.2" />
-    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="10.0.9" />
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="10.0.10" />
   </ItemGroup>
 
 

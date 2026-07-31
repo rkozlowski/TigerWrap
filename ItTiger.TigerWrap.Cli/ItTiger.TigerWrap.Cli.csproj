@@ -23,11 +23,11 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="ItTiger.Core" Version="0.8.0" />
-    <PackageReference Include="ItTiger.TigerCli" Version="0.8.0" />
-    <PackageReference Include="ItTiger.TigerQuery" Version="0.8.1" />
-    <PackageReference Include="ItTiger.TigerQuery.CliCore" Version="0.8.1" />
-    <PackageReference Include="ItTiger.TigerQuery.Core" Version="0.8.1" />
+    <PackageReference Include="ItTiger.Core" Version="0.8.1" />
+    <PackageReference Include="ItTiger.TigerCli" Version="0.8.1" />
+    <PackageReference Include="ItTiger.TigerQuery" Version="0.8.2" />
+    <PackageReference Include="ItTiger.TigerQuery.CliCore" Version="0.8.2" />
+    <PackageReference Include="ItTiger.TigerQuery.Core" Version="0.8.2" />
   </ItemGroup>
 
   <ItemGroup>
