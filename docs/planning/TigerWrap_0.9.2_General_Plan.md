@@ -25,7 +25,8 @@ TigerWrap is on the current Tiger* packages:
 
 TigerCli 0.8.1 adds no TigerWrap-specific feature but keeps TigerWrap on the current foundation.
 
-TigerQuery 0.8.2 adds two capabilities this release builds on. Both were verified against the shipped assemblies rather than assumed:
+TigerQuery 0.8.2 adds capabilities this release builds on. The statements below were verified against
+the implementation and tests at TigerQuery tag `v0.8.2`, not inferred from documentation.
 
 **Prepared execution.**
 
@@ -48,10 +49,54 @@ SqlServerConnectionMetadataFilterOperator.Equals | IsSet | IsNotSet
 
 Keys and values are compared **ordinally and case-sensitively** and are never trimmed or normalized by the library. TigerWrap must therefore fix exact literal spellings and never round-trip them through case conversion.
 
-### Two capability gaps that the plan must design around
+**Managed connection stores.**
 
-1. **Connection metadata cannot be set from the CLI in 0.8.2.** `tiger-wrap connection add --help` exposes `--server`, `--database`, `--opt`, and the security options — there is no `--metadata`. `SqlServerConnectionSettings` (the settings class behind the shared `connection add`/`edit` commands) has no metadata member. A `SqlServerConnectionMetadataOptions` type exists in `TigerQuery.CliCore` but is not wired into the shipped commands. Metadata is therefore **programmatic-only** in 0.9.2: tests set it via `SetMetadata`, and any user-facing metadata authoring must be a TigerWrap-owned command or a later TigerQuery release. This directly affects the E2E plan, which previously assumed `db create`-style flows could mint tagged connections through the standard connection commands.
-2. **`SqlServerConnectionValidationPolicy` has only `DatabaseOptional` and `DatabaseRequired`, and TigerWrap sets `DatabaseRequired` group-wide** in `TigerWrapApp.cs`. There is no way to permit a database-less connection for administrative use without permitting it for every connection. See [Decision: administrative connections target `master`](#administrative-connections-target-master).
+- `SqlServerConnectionStoreOptions.Shared(...)` and `AppSpecific(...)` resolve platform-specific
+  per-user paths; an arbitrary JSON path is already supported through `FilePath`.
+- `SqlServerConnectionStore` already supplies `Load`, `Find`, `Exists`, `Add`, `AddOrUpdate`,
+  `Delete`, `Save`, and `QueryByMetadata`. Names and metadata comparisons are ordinal and
+  case-sensitive. `Add` rejects an exact duplicate name; `AddOrUpdate` is intentionally an upsert.
+- Profiles contain the complete first-class connection surface plus the case-insensitive `Options`
+  escape hatch. `Database` maps to `SqlConnectionStringBuilder.InitialCatalog`, so a detached
+  profile can target a different database without rebuilding a raw connection string.
+- Metadata is persisted as opaque string data, is excluded from generated connection strings, and
+  survives add/edit/update unless a selected key is explicitly changed or removed. The reusable
+  `connection add`/`edit` commands expose `--metadata` and `--remove-metadata`; `connection list`
+  exposes equals/is-set/is-not-set filters. The earlier claim that metadata is programmatic-only was
+  incorrect for the verified `v0.8.2` source.
+- The default Windows protector is current-user DPAPI. A loaded SQL-password profile contains both
+  its persisted `EncryptedPassword`/`PasswordEncryption` fields and, when decryption succeeds, an
+  in-memory `PlainPassword`. Edit preserves an existing protected blob when plaintext is unavailable.
+- `SqlServerConnectionCommands.Configure` takes a host-created store through
+  `SqlServerConnectionCommandOptions.Store`. TigerWrap already passes the same store to its
+  providers and command constructors. This injection point, rather than a TigerCli change, is the
+  correct place to enforce one selected store for an application run.
+
+### Verified TigerQuery prerequisite gaps
+
+1. **There is no first-class managed-connection copy operation.** TigerWrap must not reconstruct a
+   connection string or manually duplicate profile properties. A generic same-store copy is needed
+   so future profile fields are preserved automatically and protected credentials are copied without
+   exposing or recreating plaintext.
+2. **The current load/mutate/save path cannot promise ciphertext-preserving copy semantics.** `Load`
+   unprotects profiles and `Save` invokes `ProtectForSave` on every supplied profile. On Windows that
+   can re-encrypt every loaded SQL password, including unrelated profiles. The copy operation needs
+   a persistence-safe path that clones the stored protected representation and does not depend on
+   `PlainPassword`.
+3. **Store mutations are neither synchronized nor atomic.** Every mutation loads the complete file
+   and writes it with `File.WriteAllText`; the class documentation explicitly makes callers
+   coordinate concurrent access. Concurrent test processes or a CLI/test overlap can lose updates,
+   and an interrupted write can corrupt the store. This must be corrected before the default user
+   store is used by E2E automation.
+4. **Store selection exists at the Core API level but not as one reusable application-run contract.**
+   TigerQuery deliberately does not define a universal default: `tiger-sqlcmd` selects a shared
+   vendor store while TigerWrap selects an app-specific store. The host must choose default versus
+   explicit `FilePath` once, construct one store, and inject it everywhere. TigerQuery must document
+   and test this composition; it must not add a TigerWrap-specific option or fallback behavior.
+5. **Prepared SqlCmdEx execution mishandles `:on error exit`.** See [Prepared execution](#prepared-execution).
+6. **`SqlServerConnectionValidationPolicy` has only `DatabaseOptional` and `DatabaseRequired`, and
+   TigerWrap sets `DatabaseRequired` group-wide.** The permanent E2E bootstrap therefore targets
+   `master`; no database-less-profile exception or TigerCli change is required.
 
 ## Main user-facing features
 
@@ -240,9 +285,13 @@ TigerQuery namespaced metadata distinguishes connection purpose. TigerWrap owns 
 Design notes:
 
 - **Absent means `Regular`.** Every connection that exists today has no metadata, and none of them may stop working. Role filtering must therefore treat "missing key" as `Regular`, which `SqlServerConnectionMetadataFilterOperator.IsNotSet` expresses directly.
-- **`E2E` is not a role.** The earlier draft listed `Regular` / `Administrative` / `E2E` as three roles, but `E2E` answers a different question: *administrative* versus *regular* is about what the connection may do, while *disposable* is about whether its target may be destroyed. An E2E run needs both an administrative connection (to create and drop) and a regular connection (to install into and use), and both are tagged disposable. Collapsing these into one enum forces a false choice. `Disposable` is therefore an independent flag, and `E2E` disappears as a role.
+- **`E2E` is not a `TigerWrap:ConnectionRole` value.** `Regular` / `Administrative` describes
+  user-facing DB-command eligibility. The separate `TigerWrap:E2E:Role` lifecycle axis uses
+  `Bootstrap` / `TestDatabase`; the permanent bootstrap is explicitly non-disposable and only the
+  temporary database connection is disposable. Do not collapse these independent axes.
 - Metadata is **not** a security boundary. It is a guard rail that prevents mistakes, not privilege. A user who edits `connections.json` can set anything. Documentation must say so; permissions remain the server's job.
-- TigerWrap does not create a separate connection store. Everything goes through `SqlServerConnectionStore`.
+- TigerWrap does not require or automatically create a separate connection store. Everything goes
+  through the one default or explicitly selected `SqlServerConnectionStore`.
 
 ### Administrative connections target `master`
 
@@ -370,17 +419,37 @@ Constraints that prepared execution does **not** remove:
 - it does not replace SQL-side guards or transaction logic;
 - it parses the script but does not validate SQL semantics — a script that parses can still fail on its first batch;
 - **preparing the whole chain before executing any of it is parse-only preparation.** It cannot prove step 2 will succeed, because step 2's preconditions do not exist until step 1 commits. The plan's value is that a missing script, an unreadable file, or a malformed sqlcmd structure anywhere in the chain is discovered before the first mutation — not that the chain is transactional. Documentation and the on-screen plan must not imply otherwise.
-- the deployment scripts contain `:on error exit`. **Now confirmed empirically, and the answer is
-  "no".** With `ExecutionMode = Prepared`, `Mode = SqlCmdEx` and `ContinueOnError = false`, a
-  `RAISERROR` at severity 16 in the full-deploy artifact is surfaced through `OnMessage` with
-  `IsError = true`, but the batch is *not* counted as failed: `ExecutionResult.ResultCode` stays
-  `Success` and `FailedBatches` stays `0`, and every remaining batch is still executed (they merely
-  fail to compile under `SET NOEXEC ON`, producing more error messages). sqlcmd itself does honour
-  `:on error exit` and stops, so the same artifact behaves differently under the two runners.
+- the deployment scripts contain `:on error exit`, and TigerQuery currently does **not** honour it
+  correctly. With `ExecutionMode = Prepared`, `Mode = SqlCmdEx`, and a severity-16 SQL error, the
+  diagnostic reaches `OnMessage`, but later batches can execute, `ResultCode` can remain `Success`,
+  and `FailedBatches` can remain zero. The current TigerWrap `ScriptRunner.Errors > 0` check detects
+  the bad final state but is only a backstop; it does not restore stop-on-error semantics and is not
+  an acceptable architectural workaround.
 
-  Consequence, already applied: **`db install` treats `ScriptRunner.Errors > 0` as a failure**, not
-  only `ResultCode`/`FailedBatches`, and post-execution version verification remains the final
-  backstop. Any future consumer of prepared execution must do the same. This resolves risk R8.
+The strongest implementation evidence identifies a coordinator defect rather than a parser or plan
+defect:
+
+1. `SqlCmdParser` correctly changes `QueryExecutionContext.ContinueOnError` for `:ON ERROR IGNORE`
+   and `:ON ERROR EXIT`.
+2. `PrepareExecutionPlanAsync` correctly captures that Boolean on each `ExecutionBatch`, and tests
+   prove alternating policies are retained.
+3. `ConfigureConnection` sets `SqlConnection.FireInfoMessageEventOnUserErrors = true`. Consequently,
+   provider user errors, including the confirmed severity-16 case, can arrive through `InfoMessage`.
+4. The `InfoMessage` handler only calls `LogAndRaise`; it does not mark the active batch failed or
+   signal the scheduler to stop.
+5. `ExecuteBatchesAsync` increments `FailedBatches`, sets `BatchEnd.Success = false`, and applies
+   `ContinueOnError` only in exception catch paths. If `ExecuteReaderAsync` completes after an error
+   was delivered as an info-message event, the coordinator increments `ExecutedBatches` and reports
+   success.
+
+TigerQuery must make server error diagnostics part of the active batch outcome, without double
+counting diagnostics also present on a thrown `SqlException`. Under `:on error exit`, the triggering
+batch ends once as failed, later scheduled executions do not start, the result is non-success, and
+the original SQL diagnostic remains observable. Under `:on error ignore` (or an effective
+continue-on-error option), the batch is still counted as failed but later batches run. Prepared and
+streaming modes must share the same coordinator semantics and coherent `BatchStart`, `OnMessage`,
+`BatchEnd`, plan/progress counts, and final aggregation. This correction is a TigerQuery release gate
+for TigerWrap E2E integration.
 
 ## Empty-database protection
 
@@ -481,75 +550,135 @@ One invariant follows from how the version is read: `[DbInfo].[GetCurrentVersion
 
 ## E2E testing foundation
 
-0.9.2 establishes real SQL Server-backed automated testing.
+0.9.2 establishes real SQL Server-backed automated testing through TigerQuery-managed connections.
+The current `SqlServerTestDatabase` is useful evidence for database naming, deployment, and
+best-effort cleanup, but its hard-coded `Data Source=.` raw connection strings, inferred local
+instance, temporary no-op-protected store, broad age-based orphan sweep, and direct profile
+reconstruction are explicitly replaced by this architecture.
 
-The primitives already exist as private helpers in `ItTiger.TigerWrap.Tests/DbCommandsLiveTests.cs`: `SkipUnlessSqlServerAvailableAsync`, `CreateDatabaseAsync`, `DropDatabaseAsync`, `DeployAsync` via `TigerQueryEngine`, and a temp `SqlServerConnectionStore` built with `NoOpConnectionPasswordProtector`. 0.9.2's job is to **promote them into a reusable harness** and give them a CLI-visible counterpart, not to invent them.
+### Permanent bootstrap connection contract
 
-### Harness design
+A human creates exactly one permanent managed connection in the selected TigerQuery JSON store:
 
-A `SqlServerE2EFixture` (xUnit collection fixture) providing:
+| Property | Required value |
+| --- | --- |
+| Name | `TigerWrap-E2E-Test` |
+| Database / initial catalog | `master` |
+| `TigerWrap:E2E:Type` | `TW-E2E-TEST` |
+| `TigerWrap:E2E:Role` | `Bootstrap` |
+| `TigerWrap:E2E:Disposable` | `false` |
 
-- **Availability gate** — one probe of `master`; every test in the collection skips together when the server is absent. Preserves the existing `Assert.Skip` behavior and the `Category=RequiresSqlServer` trait required by `AGENTS.md`.
-- **Unique database naming** — `TWE2E_{yyyyMMddHHmmss}_{8-hex}`. The fixed `TWE2E_` prefix is what makes orphan sweeping and `db drop`'s safety check possible; a bare GUID name would be indistinguishable from a user database.
-- **Run identity** — one `RunId` per fixture instance, written to `TigerWrap:OwnerTag` on every connection the run creates.
-- **Connection minting** — creates temp-store profiles with metadata applied programmatically via `SetMetadata` (the CLI cannot do this; see the capability gap above). Administrative connections target `master`; regular connections target the disposable database. Both carry `TigerWrap:Disposable=true`, `TigerWrap:OwnerTag`, `TigerWrap:CreatedAtUtc`.
-- **Deterministic teardown** — see below.
-- **Orphan sweep** — at collection teardown, drop databases whose name matches `TWE2E_` and whose `create_date` is older than 6 hours. This bounds the damage of a killed test run without ever touching a database that is not unambiguously ours.
+It may use Windows authentication or SQL authentication. A SQL password is stored only through
+TigerQuery's existing current-user DPAPI mechanism. The profile's existence is the explicit human
+authorization to run destructive TigerWrap E2E activity against that one SQL Server instance.
 
-### Cleanup must not hide the original failure
+The suite never creates, edits, deletes, replaces, or repairs this connection. It never selects a
+different connection, reads a raw connection string from an environment variable, or infers a
+server from `localhost`, `.`, LocalDB, source code, or machine defaults. A missing or invalid
+bootstrap causes an explicit skip/failure according to the test-run policy; it never causes fallback.
 
-The rule: **cleanup exceptions never propagate over a test failure.**
+Before creating anything, the harness finds the profile by exact name and verifies all five values,
+including exact metadata casing, then resolves and opens it to prove the `master` target is reachable.
+Metadata is a safety/ownership guard rail, not an authorization boundary beyond the deliberate human
+act of provisioning this profile; SQL Server permissions remain authoritative.
+
+### Default and optional connection stores
+
+The normal E2E path uses TigerWrap's existing default TigerQuery store, currently selected by
+`ToolkitHelper.CreateDefaultConnectionStoreOptions()` with
+`SqlServerConnectionStoreOptions.AppSpecific("ItTiger.net", "TigerWrap")`. A dedicated E2E store is
+optional, not required.
+
+For isolation, CI, or an advanced local setup, the caller may explicitly select another JSON path.
+TigerQuery Core already accepts `SqlServerConnectionStoreOptions.FilePath`; the clean integration fit
+is for TigerWrap to resolve its application-level configuration once, create one
+`SqlServerConnectionStore`, and pass that same instance to `TigerWrapApp.Build`,
+`SqlServerConnectionCommands.Configure`, providers, commands, and the E2E fixture. Do not add a
+TigerWrap-domain global option to TigerCli, and do not add TigerWrap concepts to TigerQuery. The
+eventual TigerWrap-facing configuration name and CLI spelling are intentionally not fixed here.
+
+The alternatives fit the actual composition as follows:
+
+- a TigerQuery command-group option is too narrow because TigerWrap commands and E2E setup also need
+  the selected store, and it would be available only after application composition;
+- settings inherited only by TigerQuery-provided connection commands have the same split-store flaw;
+- a TigerQuery generic service/configuration object can formalize selection but still has to be
+  created by the host; and
+- **recommended:** a TigerWrap application-level configuration value chooses default versus explicit
+  path before `TigerWrapApp.Build`, then the host forwards the resulting generic store instance into
+  the existing TigerQuery registration flow and every TigerWrap consumer.
+
+This needs no TigerCli modification and creates no TigerQuery default-store policy.
+
+When an explicit path is selected, lookup, filtering, copy, save/update, and delete all operate on
+that store instance. The code must not probe or fall back to the default path when the explicit file
+is absent, invalid, or lacks the bootstrap. The TigerQuery copy API is an instance method precisely
+so a copy cannot silently cross stores.
+
+### Temporary managed-connection lifecycle
+
+For each E2E run:
+
+1. Select the default store or the one explicitly requested store.
+2. Find and validate `TigerWrap-E2E-Test` as the permanent, non-disposable `master` bootstrap.
+3. Generate a cryptographically unique run ID, database name
+   `TWE2E_{yyyyMMddHHmmss}_{random}`, and temporary connection name.
+4. Through the bootstrap, create the database using a parameter and server-side `QUOTENAME`.
+5. Through TigerQuery's first-class copy operation, copy `TigerWrap-E2E-Test` in the same store.
+   Preserve server/instance, authentication, username, protected password material, encryption,
+   certificate trust, timeouts, pooling, free-form options, unrelated metadata, and all future generic
+   profile fields. Override only the name, database/initial catalog, and the following TigerWrap-owned
+   metadata:
+
+   | Key | Temporary value |
+   | --- | --- |
+   | `TigerWrap:E2E:Type` | `TW-E2E-TEST` |
+   | `TigerWrap:E2E:Role` | `TestDatabase` |
+   | `TigerWrap:E2E:Disposable` | `true` |
+   | `TigerWrap:E2E:ParentConnection` | `TigerWrap-E2E-Test` |
+   | `TigerWrap:E2E:RunId` | current run ID |
+   | `TigerWrap:E2E:DatabaseName` | exact disposable database name |
+
+6. Resolve the temporary connection by name from the same store and run every database-specific
+   TigerWrap command/test through it. TigerWrap never reconstructs a raw connection string.
+7. In cleanup, delete the temporary managed connection through the same TigerQuery store, then drop
+   the database through the permanent bootstrap. Never delete or alter the bootstrap.
+
+Track `databaseCreated` and `temporaryConnectionCreated` independently as soon as each operation
+succeeds. This allows cleanup after failures between the two creations and avoids pretending that
+one resource implies the other.
+
+### Cleanup safeguards and failure reporting
+
+A database is eligible for cleanup only when every check passes:
+
+- its name starts with `TWE2E_` using ordinal comparison;
+- it is not `master`, `tempdb`, `model`, `msdb`, or another system database;
+- its name and ownership metadata match the current run, or it matches a separately recorded
+  disposable ownership record;
+- the drop is issued through the validated `TigerWrap-E2E-Test` bootstrap from the selected store.
+
+Cleanup always attempts each applicable operation independently, in this order:
 
 ```text
-run the test body
--> on completion (success or failure), attempt cleanup in a finally block
--> if cleanup throws and the test body succeeded  -> fail the test with the cleanup error
--> if cleanup throws and the test body failed     -> report the original failure; attach the
-                                                     cleanup error as supplementary output only
+delete temporary managed connection from the selected store
+-> drop disposable database through the approved bootstrap
+-> report each cleanup failure and every orphaned connection/database prominently
 ```
 
-Concretely: capture the body's exception, wrap cleanup in its own try/catch, and rethrow the captured exception. Never let a `finally` block throw. A leaked database is a nuisance the orphan sweeper handles; a lost stack trace costs a debugging session.
+The harness captures the original test exception before cleanup. If cleanup also fails, the original
+exception remains primary and cleanup errors are supplementary. If the test body succeeds but cleanup
+fails, the test fails on cleanup. A process-kill recovery path may enumerate `TWE2E_` databases, but
+prefix and age alone are insufficient authority to drop: recorded disposable ownership must also
+match, and the approved bootstrap must be used.
 
 ### Test journeys
 
-Install:
-
-```text
-create administrative E2E connection (programmatic metadata)
--> db create unique test database
--> create regular disposable connection targeting it
--> db install
--> db info
--> db sqlcmd --mode SqlCmdEx --file PopulateTestDb.sql
--> configure or import projects
--> generate wrappers
--> verify output
--> db drop
--> remove temporary connections
-```
-
-Chained upgrade:
-
-```text
-db create
--> deploy TigerWrapDb 0.9.0 (packaged FullDeploy artifact)
--> db upgrade
--> verify 0.9.2 version and API level
--> db drop
-```
-
-Import/export:
-
-```text
-export projects
--> install fresh TigerWrapDb
--> import package
--> export again
--> compare $.projects arrays byte-for-byte
--> db drop
-```
-
-Negative journeys are equally required: install into a non-empty database, install into a compatibility-level-120 database, upgrade from an unsupported version, drop refused without disposable metadata, drop refused for a system database.
+Install, chained upgrade, and import/export journeys share the lifecycle above. Negative journeys
+include invalid bootstrap metadata, wrong database, disposable bootstrap, missing explicit-store
+bootstrap, duplicate temporary name, copy validation failure, failure between database and connection
+creation, install into non-empty or low-compatibility databases, unsupported upgrades, and cleanup
+refusal for mismatched ownership or a system database.
 
 ### SQL Server 2017 coverage
 
@@ -571,7 +700,9 @@ Doing none of these — leaving the DSP at `Sql150` while documenting 2017 suppo
 
 | Capability | 0.9.2 | Later |
 | --- | --- | --- |
-| Availability gate, unique naming, ownership metadata, teardown, orphan sweep | Yes | |
+| Human-provisioned bootstrap validation, unique naming, ownership metadata, safe teardown | Yes | |
+| Default TigerWrap store plus optional explicit TigerQuery JSON store | Yes | |
+| Same-store temporary managed-connection copy | Yes, after the TigerQuery prerequisite | |
 | `db create` / `db drop` / `db install` / `db info` journeys | Yes | |
 | Chained upgrade from packaged 0.9.0 and 0.9.1 artifacts | Yes | |
 | Export/import round trip against a real database | Yes | |
@@ -580,35 +711,58 @@ Doing none of these — leaving the DSP at `Sql150` while documenting 2017 suppo
 | Generated-code **compilation** | | Yes — needs a compiler harness and a stable expected-output baseline |
 | Generated-wrapper **execution** against a live database | | Yes — depends on compilation |
 | Multi-version SQL Server matrix in CI | | Yes, unless option 1 above is chosen |
-| One-command E2E environment provisioning | | Yes |
+| Automatic bootstrap provisioning | Never | |
 
 Compilation and execution coverage are deferred deliberately: each needs infrastructure of its own, and neither reduces risk for anything else in 0.9.2. Attempting them here would displace the work that does.
 
 ## Work streams and dependencies
 
-Five streams. Arrows are hard dependencies.
+Six streams. Arrows are hard dependencies.
 
 ```text
-A. DB lifecycle spine   ──┬──> C. TigerWrapDb 0.9.2 schema ──> D. Import/export
-   (roles, prepared         │
-    execution, install,     └──> E. Release hardening
-    chain resolver,
-    E2E harness)
-
-B. Response-code batch  ─────> C, D   (one DB change; must land before C freezes)
+Q. TigerQuery prerequisite ──> A. Managed-connection E2E integration ──┬──> E. Release hardening
+   (copy, store safety,         (bootstrap, temporary connection,         │
+    :on error semantics)         lifecycle journeys)                     │
+                                                                           │
+B. DB lifecycle spine ───────────────> C. TigerWrapDb 0.9.2 schema ──> D. Import/export
+Response-code batch ─────────────────> C, D
 ```
 
-- **A** depends on nothing in 0.9.2 and unblocks everything. It is the first slice.
-- **B** is small but must be batched: every new exit code is a `[Enum].[ToolkitResponseCode]` row plus a wrapper regeneration, so adding them one at a time multiplies DB churn.
-- **C** (new tables, new `[Toolkit]` procedures, `ApiLevel` 3, the 0.9.1 → 0.9.2 upgrade script, regenerated full-deploy artifact) cannot start until the `GetDbInfo` freeze decision (D1) is settled, because that decision determines how capability information is exposed.
-- **D** depends on **C** entirely.
-- **E** depends on all of them.
+- **Q is the next upstream task and the gate for A.** TigerWrap must consume a released TigerQuery
+  implementation; it must not implement profile-copy or error-handling workarounds locally.
+- **A** integrates the released generic APIs with the human-managed bootstrap lifecycle. It may
+  reuse completed TigerWrap database helpers but starts only after Q passes unit and live tests.
+- **B** is the remaining TigerWrap DB-lifecycle work and can proceed independently where it does not
+  depend on the managed E2E harness.
+- The response-code batch remains one DB change plus wrapper regeneration and must land before **C** freezes.
+- **C** (new tables, new `[Toolkit]` procedures, `ApiLevel` 3, the 0.9.1 → 0.9.2 upgrade script,
+  regenerated full-deploy artifact) still precedes **D**.
+- **E** depends on Q, A, B, C, and D.
 
 ## Suggested implementation order
 
-### Phase 1 — DB lifecycle spine
+### Phase 0 — TigerQuery prerequisite release
 
-- define TigerWrap namespaced connection metadata keys and role semantics;
+- implement the generic same-store managed-connection copy API and options;
+- preserve stored protected credentials without reconstructing or exposing plaintext;
+- make mutating store operations coordinated and crash-safe through atomic replacement;
+- document host-owned default versus explicit store selection and prove one injected store is used;
+- correct SQL user-error aggregation and `:on error exit` in the shared execution coordinator;
+- add unit and real SQL Server-backed coverage for prepared and streaming modes;
+- publish the TigerQuery release before changing TigerWrap's package dependency in a later task.
+
+This is specified in [TigerQuery Prerequisite Implementation](#tigerquery-prerequisite-implementation).
+
+### Phase 1 — TigerWrap managed E2E integration and DB lifecycle spine
+
+- consume the released TigerQuery APIs without changing TigerCli or reconstructing profiles;
+- define the exact `TigerWrap:E2E:*` metadata keys and bootstrap/test-database semantics;
+- select TigerWrap's default store or one explicit path once and inject the same store everywhere;
+- validate the human-created `TigerWrap-E2E-Test` bootstrap; never create or repair it;
+- replace `SqlServerTestDatabase`'s inferred `.` connection and temporary no-op store with bootstrap
+  database creation plus same-store temporary managed-connection copy;
+- implement independently tracked, failure-preserving connection/database cleanup and ownership-safe
+  orphan reporting;
 - add role-filtered connection providers;
 - **done** — adopt prepared execution for the existing upgrade path (`ScriptRunner`, shared by
   install and upgrade);
@@ -618,11 +772,10 @@ B. Response-code batch  ─────> C, D   (one DB change; must land before
 - replace `TigerWrapDbStatus` with the upgrade-step catalogue and chain resolver;
 - **done** — implement `db install` with CLI-side empty-database and capability preflight;
 - add the capability probe with graceful fallback for pre-0.9.2 databases;
-- **done** — promote the E2E helpers into a fixture (`SqlServerTestDatabase`);
-- **done** — establish disposable-database naming (`TWE2E_*`), teardown that never throws over a
-  test failure, and orphan sweeping. Ownership metadata still belongs to the connection-role work.
+- reuse the completed deployment, unique-name, and basic teardown primitives only after removing
+  their raw-connection and prefix/age-only assumptions.
 
-This is the [Recommended First Implementation Slice](#recommended-first-implementation-slice).
+Phase 1 is blocked until Phase 0 is released.
 
 ### Phase 2 — Script tooling and SQL-side guards
 
@@ -632,7 +785,7 @@ This is the [Recommended First Implementation Slice](#recommended-first-implemen
 - **done** — add the SQL-side empty-database and capability guard
   (`Script.PreInstallEmptyCheck.sql`, expanded into the new 0.9.2 full-deploy artifact);
 - **done** — prove CLI and SQL emptiness definitions agree (textually and behaviourally);
-- **done** — confirm `:on error exit` behavior under TigerQuery (it is not honoured; see above);
+- verify the released TigerQuery correction against TigerWrap's real deployment artifacts;
 - add the small populated fixture database used by later E2E journeys.
 
 ### Phase 3 — Response codes and TigerWrapDb 0.9.2 schema
@@ -699,19 +852,33 @@ This is the [Recommended First Implementation Slice](#recommended-first-implemen
 | R5 | Export field set drifts from `[dbo].[Project]`, as `[View].[Project]` already has | High — silent data loss in a feature whose premise is no silent data loss | Medium | Registry-completeness test (Invariant I8); fix `[View].[Project]` in Phase 3. |
 | R6 | `FOR JSON` returned as a bare statement is split into 2033-character rows | Medium — corrupt packages that look plausible | High without discipline | Always assign to `NVARCHAR(MAX)` then `SELECT`; covered by round-trip tests on a large package. |
 | R7 | Pre-deployment comment toggle produces a wrong release artifact | High — either a full deploy with no guard, or an upgrade that refuses everything | Medium | **Mitigated.** `InstallGuardArtifactTests` asserts the packaged full deploy carries the install guard before the first `CREATE SCHEMA` and does not carry the upgrade check; `BuildInstaller.ps1` fails the build otherwise. Mode-detecting rewrite still open. |
-| R8 | `:on error exit` behavior under TigerQuery is unverified | Medium — a failed batch may not stop a half-installed database | Medium | **Resolved (negative result).** TigerQuery does not stop on it; errors surface only as `IsError` messages. `db install` fails on `Errors > 0` and verifies the installed version afterwards. |
-| R9 | Connection metadata cannot be authored from the CLI in 0.8.2 | Medium — E2E flows and user-facing role tagging are limited | Certain | Programmatic-only in 0.9.2; revisit when TigerQuery surfaces `--metadata`. |
+| R8 | TigerQuery treats severity-16 `InfoMessage` diagnostics as successful batches, so `:on error exit` does not stop | High — later batches mutate state and the final result lies | Certain in the confirmed path | Fix the TigerQuery coordinator first; require failed batch/result/event and prepared/streaming live tests. TigerWrap's message-count check remains defense in depth only. |
+| R9 | The E2E bootstrap is inferred, auto-created, repaired, or replaced | Critical — tests run destructively without explicit human authorization | Medium without a closed contract | Exact-name/metadata/`master` validation; fail or skip closed; no fallback, raw connection string, localhost, `.`, or LocalDB inference. |
 | R10 | `db drop` destroys a real database | Critical | Low with safeguards | Layered safeguards; disposable metadata; `--force` and `--force-disconnect` opt-ins; system-database refusal. |
 | R11 | New exit codes each require a DB change plus wrapper regeneration | Medium — churn and mismatched CLI/DB versions | High | Batch all new response codes in one Phase 3 change. |
 | R12 | Golden packages committed before the format is settled | Medium — a "durable" format is amended after publication | Medium | Do not commit format-1 goldens until Phase 4 self-validation passes; treat the first tagged release as the freeze point. |
 | R13 | Scope creep from the "Beyond 0.9.2" list | Medium — release slips | Medium | Out-of-scope list is normative, not advisory. |
 | R14 | Chained upgrade partially completes and leaves an intermediate version | Medium — user confusion, unclear recovery | Medium | Per-step verification, explicit "database is now at version X" reporting, documented restore-from-backup recovery. |
+| R15 | A temporary profile is reconstructed and silently loses a new option or protected credential | High — E2E differs from the approved bootstrap or exposes secrets | High without a generic copy API | TigerQuery same-store copy preserves every field by default and copies protected representation without plaintext; TigerWrap overrides only name, database, and selected metadata. |
+| R16 | Default/explicit store operations split across two JSON files | High — bootstrap lookup and cleanup disagree, leaving or deleting the wrong resource | Medium | Resolve store selection once, inject one instance, and test that missing explicit-store data never falls back. |
+| R17 | Concurrent whole-file store writes lose profiles or an interrupted write corrupts the user's default store | High | Medium when tests and CLI overlap | TigerQuery-coordinated mutations plus same-directory temporary write, flush, and atomic replace; concurrency and failure-injection tests. |
+| R18 | Prefix/age orphan sweeping drops a database not owned by the current or recorded run | Critical | Low but unacceptable | Require `TWE2E_`, non-system status, approved bootstrap, and matching recorded ownership; otherwise report but do not drop. |
 
 ## Test matrix
 
 | Area | Level | Requires SQL Server | Phase |
 | --- | --- | --- | --- |
+| Same-store copy preserves every profile field, unrelated metadata, and source profile | TigerQuery unit | No | 0 |
+| Copy preserves the exact DPAPI protected representation without requiring plaintext | TigerQuery unit (Windows) | No | 0 |
+| Copy rejects missing source, duplicate target, invalid overrides, and never crosses stores | TigerQuery unit | No | 0 |
+| Concurrent add/copy/update/delete cannot lose updates; interrupted write preserves prior JSON | TigerQuery unit/integration | No | 0 |
+| Severity-16 `:on error exit` stops, fails the triggering batch/result, and preserves diagnostics | TigerQuery E2E | Yes | 0 |
+| `:on error ignore` records failure and continues; prepared/streaming event sequences agree | TigerQuery unit + E2E | Yes | 0 |
 | Connection role metadata keys and filtering | Unit | No | 1 |
+| Default store and explicit store each use only the selected bootstrap and temporary connection | App/E2E | Yes | 1 |
+| Missing/invalid bootstrap and missing explicit-store bootstrap fail closed without fallback | App | No | 1 |
+| Bootstrap remains byte-for-byte unchanged across successful and failed E2E runs | E2E | Yes | 1 |
+| Temporary copy preserves Windows/SQL authentication and generic settings | E2E | Yes | 1 |
 | Role-filtered providers reject wrong-role named connections | App | No | 1 |
 | Upgrade chain resolution: 0.9.0, 0.9.1, current, unknown, newer | Unit | No | 1 |
 | Missing catalogue script fails during planning, before mutation | Unit | No | 1 |
@@ -722,12 +889,12 @@ This is the [Recommended First Implementation Slice](#recommended-first-implemen
 | `db install` refuses a non-empty database | E2E | Yes | 1 |
 | `db install` refuses compatibility level < 130 | E2E | Yes | 1 |
 | Capability probe falls back cleanly against 0.9.0 and 0.9.1 databases | E2E | Yes | 1 |
-| Orphan sweep drops only `TWE2E_`-prefixed stale databases | E2E | Yes | 1 |
+| Cleanup drops only owned `TWE2E_` non-system databases through the approved bootstrap | E2E | Yes | 1 |
 | Cleanup failure does not mask the original test failure | Unit | No | 1 |
 | SQL-side guard refuses a non-empty database when run directly | E2E | Yes | 2 |
 | CLI and SQL emptiness definitions agree on the same database | E2E | Yes | 2 |
 | `db sqlcmd` executes a file and reports deterministic exit codes | E2E | Yes | 2 |
-| `:on error exit` stops execution as expected | E2E | Yes | 2 |
+| TigerWrap deployment artifacts observe corrected TigerQuery `:on error exit` semantics | E2E | Yes | 2 |
 | API level 3 rejects 0.9.1 CLI; 0.9.2 CLI rejects API level 2 | E2E | Yes | 3 |
 | Export field registry completeness vs `[dbo].[Project]` columns | E2E | Yes | 3 |
 | Export determinism across repeated runs | E2E | Yes | 4 |
@@ -767,7 +934,10 @@ Documentation must clearly explain:
 - that the package checksum is an integrity check, not a signature;
 - that project-name conflict detection follows the target database's collation;
 - WinGet installation and update, and that GitHub releases may appear before WinGet updates;
-- menu-driven workflows and script-oriented commands.
+- menu-driven workflows and script-oriented commands;
+- human provisioning of `TigerWrap-E2E-Test`, the default-store behavior, optional explicit-store
+  isolation, and the fact that the bootstrap is permanent and never managed by the test suite;
+- orphaned-resource diagnostics and the manual recovery procedure.
 
 Screenshots: main menu; DB info; DB install; DB upgrade plan and progress; project export selection; import conflict plan; import result.
 
@@ -775,6 +945,18 @@ Screenshots: main menu; DB info; DB install; DB upgrade plan and progress; proje
 
 0.9.2 is not released until:
 
+- the TigerQuery prerequisite release provides tested same-store managed-connection copy,
+  coordinated atomic store mutation, and corrected `:on error` result/event semantics;
+- the E2E suite uses only the exact human-created `TigerWrap-E2E-Test` bootstrap from the selected
+  default or explicit store and refuses every missing/invalid/fallback case;
+- neither TigerWrap production code nor tests use raw/inferred SQL Server connection strings for
+  E2E setup, and the bootstrap is never created, modified, or deleted by automation;
+- each E2E database is reached through a TigerQuery copy that preserves the bootstrap's connection
+  and protected-credential settings while overriding only name, database, and selected metadata;
+- explicit-store lookup, filtering, copy, update/save, and delete never touch the default store;
+- cleanup tracks the database and temporary connection separately, preserves the original failure,
+  reports orphaned resources, and drops only an owned `TWE2E_` non-system database through the
+  approved bootstrap;
 - project export works for all and selected projects;
 - export validates itself, including read-back, and is byte-deterministic;
 - project import supports the documented conflict actions;
@@ -789,7 +971,8 @@ Screenshots: main menu; DB info; DB install; DB upgrade plan and progress; proje
 - the full-install script independently refuses occupied databases when run directly;
 - chained upgrades work from 0.9.0 and 0.9.1, with per-step verification;
 - the 0.9.2 CLI can still probe and upgrade 0.9.0 and 0.9.1 databases (Invariant I1 holds in practice, not only on paper);
-- prepared execution is used for all SQL script workflows;
+- prepared execution is used for all SQL script workflows, and a triggering SQL error under
+  `:on error exit` stops later batches, fails the batch and final result, and preserves diagnostics;
 - progress reporting shows batch N of M;
 - `db drop` refuses every documented unsafe case;
 - E2E tests create and clean up disposable databases, and cleanup failures never mask test failures;
@@ -812,9 +995,8 @@ Screenshots: main menu; DB info; DB install; DB upgrade plan and progress; proje
 - generated-code compilation and wrapper-execution E2E coverage;
 - parser stress database integration;
 - multi-version SQL Server CI matrix;
-- one-command E2E environment provisioning;
+- one-command disposable E2E environment provisioning after (and never including) human bootstrap provisioning;
 - a composed `db create + install` operation;
-- user-facing connection metadata authoring, once TigerQuery surfaces it.
 
 These must not expand the 0.9.2 scope.
 
@@ -831,8 +1013,262 @@ These must not expand the 0.9.2 scope.
 9. No partial project mutation.
 10. Replace imports first and deletes later.
 11. Real SQL Server testing is part of the release gate.
+12. The permanent managed bootstrap is explicit authorization; automation never provisions it or
+    falls back to another server or store.
+13. Temporary managed connections are copied through TigerQuery, never rebuilt from raw connection
+    strings or property lists in TigerWrap.
+14. Store selection is made once per application/test run and is honored by every operation.
 
-## Recommended First Implementation Slice
+## TigerQuery Prerequisite Implementation
+
+This is the one substantial next implementation task. It modifies `C:\Projects\TigerQuery` first.
+TigerWrap E2E integration does not start until the resulting generic TigerQuery release is available.
+
+### Objective
+
+Make TigerQuery a safe generic foundation for managed-connection test lifecycles and reliable sqlcmd
+execution by delivering, as one coherent change:
+
+- a first-class, same-store managed-connection copy operation;
+- coordinated, atomic managed-store mutations suitable for a normal user store;
+- an explicit host-owned default/explicit store-selection contract; and
+- correct SQL-error aggregation and `:on error exit` behavior in prepared and streaming execution.
+
+TigerQuery remains unaware of TigerWrap names, metadata keys, database prefixes, roles, and cleanup
+policy. TigerWrap composes the released generic capabilities later.
+
+### Current gaps
+
+- `SqlServerConnectionStore` has read/add/upsert/delete/filter APIs but no copy/clone API.
+- `SqlServerConnectionProfile` is mutable and has no complete deep-copy primitive. Hand-copying its
+  current property list would be fragile; `Options` and metadata also require independent copies.
+- `Load` unprotects secrets and `Save` protects all supplied profiles. A copy built through that path
+  can re-encrypt source/unrelated DPAPI blobs and depends on plaintext being available.
+- store mutation is unsynchronized read-modify-write with direct `File.WriteAllText`, so concurrent
+  writers can lose updates and a torn write can destroy the only JSON file.
+- explicit `FilePath` construction exists, but default selection belongs to each host and there is no
+  documented invariant that one selected store instance must serve all operations in a run.
+- parser and prepared-plan handling of `:on error` are correct, but user errors delivered through
+  `SqlConnection.InfoMessage` are not incorporated into the active batch outcome.
+
+### Generic API changes required
+
+Add a small Core surface whose naming may follow repository conventions but whose semantics are fixed:
+
+```csharp
+public sealed class SqlServerConnectionCopyOptions
+{
+    public required string TargetName { get; init; }
+
+    // null = preserve the source value; empty = clear; non-empty = replace.
+    public string? InitialCatalogOverride { get; init; }
+
+    public IReadOnlyDictionary<string, string> MetadataToSet { get; init; }
+        = new Dictionary<string, string>();
+    public IReadOnlyCollection<string> MetadataToRemove { get; init; }
+        = Array.Empty<string>();
+}
+
+public sealed class SqlServerConnectionStore
+{
+    public SqlServerConnectionProfile Copy(
+        string sourceName,
+        SqlServerConnectionCopyOptions options,
+        SqlServerConnectionValidationPolicy? validationPolicy = null);
+}
+```
+
+The implementation may choose a result type instead of documented exceptions if that fits TigerQuery
+better, but do not expose a property-by-property TigerWrap callback and do not accept a destination
+store. Binding copy to the source store is the no-cross-store guarantee. Default validation policy is
+`DatabaseOptional`; a caller may require a database. Promote complete profile validation into Core if
+needed so copy validates required fields, authentication/credential presence, and
+`SqlConnectionStringBuilder` compatibility without making CLI internals public.
+
+Do not add a universal TigerQuery default store. `Shared`, `AppSpecific`, and explicit `FilePath` are
+valid because the host owns that choice. If a lightweight generic factory/configuration type improves
+composition, it may select exactly one of a host-supplied default-options factory or an explicit path,
+but it must have no fallback and no TigerCli dependency. Existing
+`SqlServerConnectionCommandOptions.Store` remains the command-group injection point.
+
+### Managed connection copy semantics
+
+One atomic call must:
+
+1. validate nonblank source and target names;
+2. read the source and check the exact, case-sensitive target name while holding the same mutation
+   coordination used through commit;
+3. fail when the source is absent or target exists; it is never an upsert;
+4. deep-copy every current and future generic profile property, free-form option, and metadata value;
+5. preserve persisted protected-secret fields exactly and never require, expose, log, callback, or
+   reconstruct plaintext;
+6. override only target name, optional initial catalog, metadata entries explicitly set, and metadata
+   keys explicitly removed; preserve all unrelated metadata;
+7. validate the resulting profile without opening a SQL connection;
+8. persist through TigerQuery's normal store transaction in the same selected JSON file;
+9. leave the source profile and every unrelated profile semantically and byte-for-byte unchanged,
+   including encrypted password values; and
+10. return the detached persisted copy so callers can resolve it and later delete it through normal
+    APIs.
+
+The persistence design must not serialize from a set of already-unprotected live profiles. Introduce
+an internal persisted-profile load/clone path or equivalent separation between at-rest and resolved
+models. It must automatically carry newly added profile fields so future additions do not require
+TigerWrap changes. DPAPI ciphertext is opaque data for copy; only ordinary connection resolution may
+unprotect it.
+
+### Default and explicit store behavior
+
+- Existing `Shared(...)`, `AppSpecific(...)`, and direct `FilePath` behavior stays compatible.
+- A host chooses its default or explicit path once and constructs/injects one store.
+- `Load`, `Find`, metadata filtering, copy, add, update, save, and delete all use that exact store.
+- A missing, malformed, inaccessible, or incomplete explicit store reports that error; no operation
+  probes a default location.
+- Expose the normalized selected path read-only if diagnostics/tests need to prove store identity;
+  never log profile contents or secrets.
+- The reusable connection commands continue to accept a store from the host. Do not add a TigerCli
+  global option; do not define TigerWrap CLI syntax in TigerQuery.
+
+### Metadata requirements
+
+Metadata remains generic, opaque, ordinal, case-sensitive, non-secret string data. Copy preserves it
+all by default, then applies exact-key removals and sets. Reject empty keys, null values, duplicate set
+keys, and a key present in both set and remove collections. Reuse the existing validation semantics
+behind `SqlServerConnectionMetadataOptions` where practical, moving only genuinely generic logic into
+Core. TigerQuery must never recognize `TigerWrap:E2E:*` or any value used by TigerWrap.
+
+### Protected credential handling
+
+- Windows DPAPI remains the default Windows strategy; non-Windows behavior remains non-persisting.
+- Copying a stored SQL-auth profile copies `EncryptedPassword` and `PasswordEncryption` exactly while
+  leaving `PlainPassword` absent from the copy transaction.
+- Copy succeeds when the current process cannot decrypt the blob; usability later follows the normal
+  resolver/protector behavior.
+- Copy does not re-protect source or unrelated profiles and never changes their ciphertext.
+- Add/update compatibility remains, but atomic mutation must not introduce plaintext persistence.
+- Tests and diagnostics compare protected blobs where needed but never print plaintext.
+
+### Store coordination and atomic writes
+
+All read-modify-write mutations (`Add`, `AddOrUpdate`, `Delete`, `Copy`, and any public whole-store
+save path) must share coordination scoped to the normalized file path. Serialize to a same-directory
+temporary file, flush it, and atomically replace/move the destination only after serialization and
+validation succeed. Preserve the previous valid file on failure and remove only the operation's own
+temporary artifact. Define behavior for first creation and platforms where replace primitives differ.
+
+At minimum, coordination must protect writers within one process. Prefer a narrowly scoped cross-process
+lock because the default store can be opened by TigerWrap, tiger-sqlcmd, tests, and another process;
+document the guarantee actually delivered and make timeout/cancellation/failure behavior explicit.
+Preserve existing JSON shape, ordering, metadata ordering, and case-sensitive duplicate rules.
+
+### `:on error exit` correction
+
+Treat SQL diagnostics raised through `InfoMessage` as part of the currently executing batch:
+
+- collect diagnostics only inside the active `BatchStart`/`BatchEnd` interval;
+- distinguish informational messages from errors using the existing `SqlCmdMessage` severity model;
+- if any qualifying SQL error was observed, mark that batch attempt failed even when provider
+  execution returned normally;
+- preserve every diagnostic through `OnMessage` exactly once and avoid double counting an error that
+  is also present in a thrown `SqlException`;
+- under effective exit-on-error, set a non-success `ExecutionResultCode`, increment `FailedBatches`,
+  set `BatchEnd.Success=false`, retain an appropriate exception/diagnostic representation, and do not
+  raise `BatchStart`/`BatchEnd` for unexecuted batches;
+- under effective ignore/continue, increment `FailedBatches`, end the triggering batch unsuccessfully,
+  then execute the next scheduled batch; final result compatibility must remain documented (currently
+  `Success` may coexist with ignored failed batches);
+- fatal, cancellation, parser, connection-opening, and callback behavior must remain coherent; and
+- prepared and streaming schedulers must use the same active-batch outcome logic.
+
+Match normal sqlcmd semantics for at least `RAISERROR`/`THROW` severity 16 under `:on error exit` and
+`:on error ignore`. Test any intentional severity threshold difference explicitly instead of relying
+on the `InfoMessage` transport accident.
+
+### Affected TigerQuery areas
+
+- `ItTiger.TigerQuery.Core/SqlServerConnectionStore*`
+- `SqlServerConnectionProfile`, password-protector integration, validation, and metadata mutation
+- Core README/XML/API documentation and DocFX output
+- `ItTiger.TigerQuery.CliCore` only where it can reuse promoted generic validation or document injected
+  store selection; existing command behavior and exit mappings remain compatible
+- `SqlCmdParser` and `PreparedExecutionPlan` primarily as regression boundaries, not expected root-cause
+  locations
+- `TigerQueryEngine.ConfigureConnection`, batch scheduler/coordinator, message handling, `BatchEnd`,
+  `ExecutionResult`, and related documentation
+- TigerQuery unit and SQL Server-backed test projects
+
+### Unit tests
+
+- copy every profile field, an independent `Options` dictionary, all metadata, and future-field
+  completeness; source mutation after copy cannot affect target and vice versa;
+- override name/catalog/selected metadata, remove selected metadata, and preserve unrelated keys;
+- missing source, blank names, exact-case duplicate target, invalid metadata mutations, invalid profile,
+  and persistence failure leave the store unchanged;
+- integrated-auth and SQL-auth copy; exact DPAPI blob preservation without plaintext; undecryptable
+  protected blob copy; no source/unrelated ciphertext churn;
+- default-path options and explicit path create distinct stores; every operation stays on the chosen
+  store and missing explicit data never triggers a default probe;
+- concurrent add/copy/update/delete has no lost updates; fault injection before atomic replace leaves
+  the old JSON readable; no partial JSON is observable;
+- parser/plan policy capture remains correct around `GO`, repeated batches, and alternating directives;
+- coordinator tests cover info-only, one user error, multiple diagnostics, thrown `SqlException`
+  deduplication, exit versus ignore, repeat counts, event order, counts, and unexecuted batches.
+
+### Real SQL Server-backed tests
+
+Run both prepared and streaming modes against scripts containing successful batches before and after:
+
+- `:on error exit` plus `RAISERROR(..., 16, ...)`;
+- `:on error exit` plus `THROW`;
+- `:on error ignore` plus the same failures;
+- fatal/error variants supported by the existing result model; and
+- `GO n` where an early iteration fails.
+
+Assert executed SQL side effects, `ExecutionPlanReady` presence/absence, `BatchStart`/`OnMessage`/
+`BatchEnd` order, failed and executed counts, final result code, preserved SQL number/severity/state/line,
+and absence of success events for unexecuted work. Add a Windows SQL-auth store/copy/resolve/open test
+when credentials are available; otherwise keep DPAPI mechanics in Windows unit tests and cover
+integrated-auth copy/open live.
+
+### Compatibility and public API implications
+
+- Existing JSON files, metadata omission/order, profile names, path helpers, connection strings,
+  add/edit/list/show/delete commands, semantic exit kinds, and default execution mode remain compatible.
+- Do not rename existing properties or change default store paths.
+- Do not change NuGet versions in this planning task; the later TigerQuery implementation/release task
+  owns normal versioning and package notes.
+- New public types/members require XML comments, Core/CliCore README examples, DocFX inclusion, and
+  release notes that call out the stronger mutation guarantee and corrected execution semantics.
+- If ignored failed batches retain `ExecutionResultCode.Success`, document that compatibility
+  explicitly; exit-on-error must never return success.
+
+### Completion criteria
+
+- the generic copy API satisfies every semantic rule above without plaintext reconstruction;
+- all mutating store APIs use the documented coordination/atomic-write path;
+- default and explicit-store tests prove there is no fallback or cross-store mutation;
+- prepared and streaming live tests prove sqlcmd-compatible exit/ignore behavior and coherent events;
+- existing TigerQuery tests and CLI exit-code contracts remain green;
+- Core/CliCore/engine XML docs, READMEs, DocFX, build, test, and `git diff --check` are clean; and
+- a TigerQuery release containing these capabilities is available before TigerWrap integration begins.
+
+### Explicit non-goals
+
+- no TigerWrap connection names, metadata keys/values, database prefixes, ownership rules, or cleanup
+  logic in TigerQuery;
+- no bootstrap creation or E2E fixture in TigerQuery;
+- no raw connection-string reconstruction helper;
+- no cross-store copy;
+- no TigerCli changes and no TigerCli global option;
+- no TigerWrap workaround for engine result aggregation;
+- no automatic store fallback, store migration, cloud secret vault, or replacement for DPAPI; and
+- no TigerWrap production or test changes in this upstream task.
+
+## Deferred TigerWrap Lifecycle Slice
+
+The former recommended first slice below is retained as downstream historical context. It is not the
+next task and must not be implemented until the TigerQuery prerequisite above has been released and
+consumed. Where it conflicts with the managed-connection lifecycle above, the newer lifecycle wins.
 
 ### Slice: the TigerWrapDb lifecycle spine
 
@@ -867,7 +1303,9 @@ The spine is the right size because it is where the release's dependencies conve
 6. `DbCreateCommand`, `DbDropCommand` (new, menu-excluded): as specified in [`db create`](#db-create) and [`db drop`](#db-drop).
 7. `DbCommandSupport`: a capability probe that calls `[Toolkit].[GetDbCapabilities]` and treats SQL error 2812 as "pre-0.9.2 database", using the existing `ProbeAsync` fallback pattern. The procedure does not exist yet; the fallback path is the entire point and is fully testable today against 0.9.0 and 0.9.1 databases.
 8. Role-filtered connection providers registered in `TigerWrapApp`.
-9. `ItTiger.TigerWrap.Tests`: promote the `DbCommandsLiveTests` helpers into a `SqlServerE2EFixture` with unique naming, ownership metadata, safe teardown, and orphan sweeping; migrate the existing upgrade journey test onto it.
+9. `ItTiger.TigerWrap.Tests`: after the TigerQuery prerequisite is consumed, replace the current
+   raw/inferred connection fixture with the permanent-bootstrap, same-store copy, ownership, and safe
+   cleanup lifecycle specified above; migrate the existing upgrade journey test onto it.
 
 **Explicitly not in scope**
 
@@ -883,7 +1321,8 @@ The spine is the right size because it is where the release's dependencies conve
 
 ### Acceptance criteria for the slice
 
-The slice is done when all of the following hold, verified against a real local SQL Server:
+The slice is done when all of the following hold, verified against the SQL Server explicitly approved
+by the selected bootstrap connection:
 
 1. `db create` creates a database from an administrative connection, rejects invalid names, refuses a regular-role connection, and reports the created database's collation and compatibility level.
 2. `db drop` refuses: a system database; a database with no disposable-tagged connection and no `--force`; the database its own connection targets; a non-interactive run without `--confirm`. It succeeds for a disposable-tagged database and does not force-disconnect unless `--force-disconnect` is supplied.
@@ -898,17 +1337,21 @@ The slice is done when all of the following hold, verified against a real local 
 11. A deliberately malformed script fails during preparation, with no connection opened and no database mutation — asserted, not assumed.
 12. The capability probe returns "pre-0.9.2" against real 0.9.0 and 0.9.1 databases without throwing, and `db info` renders correctly for both.
 13. Connections with no metadata behave exactly as `Regular`; no existing `connections.json` requires migration, and `ConnectionCompatibilityTests` still passes unchanged.
-14. Every E2E database created by the suite is named `TWE2E_*`, is dropped on success, and is swept on a subsequent run if leaked.
+14. Every E2E database created by the suite is named `TWE2E_*`; cleanup or recovery drops it only
+    through the approved bootstrap and only with matching current/recorded ownership.
 15. A test whose body fails and whose cleanup also fails reports the body's failure, with the cleanup error as supplementary output only.
 16. `dotnet build` in Release is warning-clean and `dotnet test` is green with and without a local SQL Server.
 
-## Next-Agent Implementation Brief
+## Deferred TigerWrap Implementation Brief
 
-A self-contained specification for the slice above. Implement exactly this; do not begin import/export.
+This is downstream reference material, not the next task. Do not execute it until the
+[TigerQuery prerequisite](#tigerquery-prerequisite-implementation) is released; then reconcile it
+with the authoritative managed-connection E2E architecture before coding.
 
 ### Objective
 
-Deliver the TigerWrapDb lifecycle spine: `db create`, `db drop`, `db install`, a chained `db upgrade`, connection-role metadata, prepared execution with real batch progress, a failure-tolerant capability probe, and a reusable SQL Server E2E fixture — **with zero changes to `TigerWrapDb/`**.
+After the upstream gate, deliver the remaining TigerWrapDb lifecycle spine and the managed-connection
+E2E fixture — **with zero changes to `TigerWrapDb/` in this downstream slice**.
 
 ### Files and areas likely affected
 
@@ -968,6 +1411,8 @@ tiger-wrap db info     <connection>
 - `db install` must not run against a database that is not empty, is below compatibility level 130, or is reached through an `Administrative` connection.
 - The upgrade chain stops at the first failed step and reports the database's actual version rather than a presumed one.
 - No test may drop a database whose name does not start with `TWE2E_`.
+- Prefix alone is never sufficient: require matching ownership, a non-system database, and the
+  validated permanent bootstrap; never create, edit, or delete the bootstrap.
 - Cleanup code never throws over a test failure.
 
 ### Tests
@@ -988,4 +1433,7 @@ E2E (`Category=RequiresSqlServer`, skip when absent): every numbered acceptance 
 
 ### Completion criteria
 
-All sixteen slice acceptance criteria pass; `dotnet build -c Release` is warning-clean; `dotnet test` is green both with and without a local SQL Server; no file under `TigerWrapDb/` is modified; and `git diff --check` is clean.
+The TigerQuery prerequisite has first been released and consumed; all sixteen downstream slice
+acceptance criteria plus the managed-connection acceptance criteria pass; `dotnet build -c Release`
+is warning-clean; `dotnet test` is green both with and without a configured bootstrap; no file under
+`TigerWrapDb/` is modified; and `git diff --check` is clean.
