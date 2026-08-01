@@ -254,6 +254,7 @@
     <None Include="Scripts\Script.Parser.StaticDataInserts.sql" />
     <None Include="Scripts\Script.Parser.Data.sql" />
     <None Include="Scripts\Script.PreUpgradeVersionCheck.sql" />
+    <None Include="Scripts\Script.PreInstallEmptyCheck.sql" />
   </ItemGroup>
   <ItemGroup>
     <PreDeploy Include="Scripts\Script.PreDeployment.sql" />

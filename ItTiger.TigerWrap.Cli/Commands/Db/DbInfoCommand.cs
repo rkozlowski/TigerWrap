@@ -112,7 +112,7 @@ public sealed class DbInfoCommand(SqlServerConnectionStore connectionStore)
                 TigerConsole.MarkupLine(s.E(
                     "[Warning]Status: upgrade available ({0} -> {1}).[/]",
                     DbCommandSupport.UpgradeSourceVersion,
-                    ExpectedDbInfo.CurrentSchemaVersion));
+                    DbCommandSupport.UpgradeTargetVersion));
                 TigerConsole.MarkupLine(s.E(
                     "Run [Key]tiger-wrap db upgrade[/] to upgrade this database."));
                 break;

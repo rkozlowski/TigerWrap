@@ -10,7 +10,7 @@ namespace ItTiger.TigerWrap.Cli.Commands.Db;
 /// </summary>
 internal enum TigerWrapDbStatus
 {
-    /// <summary>Schema version and API level match this tool version.</summary>
+    /// <summary>The database needs no upgrade: see <see cref="DbCommandSupport.NeedsNoUpgrade"/>.</summary>
     Current,
 
     /// <summary>Exactly the supported upgrade source version (0.9.0).</summary>
@@ -40,8 +40,26 @@ internal static class DbCommandSupport
     /// <summary>The only schema version <c>db upgrade</c> can upgrade from in this release.</summary>
     public const string UpgradeSourceVersion = "0.9.0";
 
+    /// <summary>
+    /// The version the packaged upgrade artifact produces. Pinned to the released
+    /// <c>0.9.0 -> 0.9.1</c> step rather than derived from
+    /// <see cref="ExpectedDbInfo.CurrentSchemaVersion"/>: TigerWrapDb 0.9.2 adds the install-time
+    /// empty-database guard and the new version row, but no schema objects and no API level, so
+    /// there is no <c>0.9.1 -> 0.9.2</c> upgrade script and a 0.9.1 database needs none. The
+    /// upgrade-step catalogue that replaces this pair belongs to the chained-upgrade increment.
+    /// </summary>
+    public const string UpgradeTargetVersion = "0.9.1";
+
     public static string UpgradeScriptFileName =>
-        $"TigerWrapDb_Upgrade_v_{UpgradeSourceVersion}_to_{ExpectedDbInfo.CurrentSchemaVersion}.sql";
+        $"TigerWrapDb_Upgrade_v_{UpgradeSourceVersion}_to_{UpgradeTargetVersion}.sql";
+
+    /// <summary>
+    /// The packaged full-install artifact <c>db install</c> executes. Always the artifact for the
+    /// current schema version, so development against an unreleased TigerWrapDb never installs -
+    /// or edits - a released artifact.
+    /// </summary>
+    public static string FullDeployScriptFileName =>
+        $"TigerWrapDb_FullDeploy_v_{ExpectedDbInfo.CurrentSchemaVersion}.sql";
 
     // SQL Server error 2812: could not find stored procedure.
     private const int SqlErrorMissingStoredProcedure = 2812;
@@ -89,7 +107,7 @@ internal static class DbCommandSupport
             return TigerWrapDbStatus.NotTigerWrapDb;
         }
 
-        if (string.Equals(info.Version, ExpectedDbInfo.CurrentSchemaVersion, StringComparison.OrdinalIgnoreCase))
+        if (NeedsNoUpgrade(info.Version))
         {
             return TigerWrapDbStatus.Current;
         }
@@ -105,6 +123,17 @@ internal static class DbCommandSupport
                 ? TigerWrapDbStatus.NewerThanTool
                 : TigerWrapDbStatus.OlderUnsupported;
     }
+
+    /// <summary>
+    /// Versions this tool has nothing to upgrade: the current schema version, and the version the
+    /// packaged upgrade artifact produces. They are listed separately because TigerWrapDb 0.9.2
+    /// contains exactly the same schema objects and the same API level as 0.9.1 - it differs only
+    /// in the install-time guard and the version row - so a 0.9.1 database is already usable and
+    /// there is no upgrade script that would move it to 0.9.2.
+    /// </summary>
+    public static bool NeedsNoUpgrade(string? version) =>
+        string.Equals(version, ExpectedDbInfo.CurrentSchemaVersion, StringComparison.OrdinalIgnoreCase)
+        || string.Equals(version, UpgradeTargetVersion, StringComparison.OrdinalIgnoreCase);
 
     public static (string? connectionString, string? error) ResolveConnectionString(
         SqlServerConnectionStore connectionStore,

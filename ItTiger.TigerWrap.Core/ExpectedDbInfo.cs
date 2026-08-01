@@ -6,7 +6,7 @@
 
         // Schema version installed by the current release scripts.
         // Must track TigerWrapDb/Scripts/Script.Version.sql.
-        public const string CurrentSchemaVersion = "0.9.1";
+        public const string CurrentSchemaVersion = "0.9.2";
 
         // API level 2: description attribute support (new ProjectEnum/Project columns and
         // stored procedure parameters). The generated wrappers pass the new parameters, so

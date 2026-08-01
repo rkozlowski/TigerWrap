@@ -14,13 +14,27 @@ $workingDir        = "$PSScriptRoot\WorkingDir"
 $cliOutputDir      = "$workingDir\cli"
 $sqlOutputDir      = "$workingDir\sql"
 $deploymentScripts = "$projectRoot\TigerWrapDb\DeploymentScripts"
+$schemaVersionFile = "$projectRoot\TigerWrapDb\Scripts\Script.Version.sql"
 
 # Step 1: Read version from Version.props
 [xml]$xml = Get-Content $versionFile
 $version = $xml.Project.PropertyGroup.Version
 $versionInfo = "$version.0"  # Inno Setup wants 4-part version
 
-Write-Host "`nBuilding TigerWrap Installer v$version..." -ForegroundColor Cyan
+# Step 1b: Read the TigerWrapDb schema version from its own source of truth.
+# It is deliberately independent of the CLI/product version: the metadata database is versioned by
+# Script.Version.sql (which ExpectedDbInfo.CurrentSchemaVersion tracks), and the two move on their
+# own schedules. Packaging the full deploy by product version would silently ship - or demand - a
+# released artifact belonging to a different schema version.
+$schemaVersionMatch = [regex]::Match(
+    (Get-Content $schemaVersionFile -Raw),
+    "@version\s+VARCHAR\(50\)\s*=\s*'(?<v>[^']+)'")
+if (-not $schemaVersionMatch.Success) {
+    throw "Could not read the TigerWrapDb schema version from $schemaVersionFile."
+}
+$schemaVersion = $schemaVersionMatch.Groups['v'].Value
+
+Write-Host "`nBuilding TigerWrap Installer v$version (TigerWrapDb $schemaVersion)..." -ForegroundColor Cyan
 
 # Step 2: Clean working directory
 Write-Host "Cleaning WorkingDir..."
@@ -60,12 +74,21 @@ New-Item -ItemType Directory -Path $sqlOutputDir -Force | Out-Null
 Get-ChildItem "$deploymentScripts\TigerWrapDb_Upgrade_*.sql" |
     Copy-Item -Destination $sqlOutputDir
 
-# Copy full deploy script for current version
-$fullDeploy = "$deploymentScripts\TigerWrapDb_FullDeploy_v_$version.sql"
-if (Test-Path $fullDeploy) {
-    Copy-Item $fullDeploy -Destination $sqlOutputDir
-} else {
-    Write-Warning "Full deploy script not found: $fullDeploy"
+# Copy the full deploy script for the current TigerWrapDb schema version.
+# 'tiger-wrap db install' resolves exactly this file from {app}\sql, so a missing artifact is a
+# broken installer, not a warning.
+$fullDeploy = "$deploymentScripts\TigerWrapDb_FullDeploy_v_$schemaVersion.sql"
+if (-not (Test-Path $fullDeploy)) {
+    throw "Full deploy script not found: $fullDeploy. 'db install' cannot work without it."
+}
+Copy-Item $fullDeploy -Destination $sqlOutputDir
+
+# The packaged full deploy must carry the install guard (Script.PreInstallEmptyCheck.sql), which
+# is only present when the artifact was generated with the install guard active in the
+# pre-deployment script.
+if (-not (Select-String -Path $fullDeploy -SimpleMatch -Quiet `
+        -Pattern "TigerWrapDb installation refused")) {
+    throw "Full deploy script $fullDeploy does not contain the empty-database install guard."
 }
 
 # Step 5: Generate VERSION.txt

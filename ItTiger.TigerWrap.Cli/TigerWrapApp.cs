@@ -53,15 +53,19 @@ internal static class TigerWrapApp
             })
             .AddCommandGroup("db", group =>
             {
-                group.SetDescription("Inspect and upgrade a TigerWrap database.");
+                group.SetDescription("Install, inspect and upgrade a TigerWrap database.");
                 group.AddCommand(
                     "info",
                     () => new DbInfoCommand(connectionStore),
                     "Show TigerWrap database version, API level and compatibility.");
                 group.AddCommand(
+                    "install",
+                    () => new DbInstallCommand(connectionStore),
+                    $"Install TigerWrapDb {ExpectedDbInfo.CurrentSchemaVersion} into an existing empty database.");
+                group.AddCommand(
                     "upgrade",
                     () => new DbUpgradeCommand(connectionStore),
-                    $"Upgrade a TigerWrap database ({DbCommandSupport.UpgradeSourceVersion} -> {ExpectedDbInfo.CurrentSchemaVersion}).");
+                    $"Upgrade a TigerWrap database ({DbCommandSupport.UpgradeSourceVersion} -> {DbCommandSupport.UpgradeTargetVersion}).");
             })
             .AddCommand(
                 "languages-list",

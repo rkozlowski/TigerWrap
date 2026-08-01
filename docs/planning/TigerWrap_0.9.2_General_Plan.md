@@ -74,6 +74,31 @@ Described in detail in [TigerWrap_0.9.2_Project_Import_Export_Design.md](TigerWr
 
 ### 2. TigerWrapDb install
 
+**Status: implemented.** `db install` is registered menu-visible in the `db` group, runs the CLI
+preflight, executes the packaged full-install artifact in prepared mode with batch-level progress,
+and verifies the resulting version and API level. The authoritative SQL-side guard
+(`TigerWrapDb/Scripts/Script.PreInstallEmptyCheck.sql`) is in the SSDT source and expanded into the
+newly generated `TigerWrapDb_FullDeploy_v_0.9.2.sql`. Connection-role filtering is **not** part of
+this increment: `db install` accepts any saved connection, because the role metadata belongs to the
+(still outstanding) `db create`/`db drop` work.
+
+**Versioning.** Adding the guard changes what a full install produces, so it is a TigerWrapDb
+change and gets its own version: `Script.Version.sql` moves to `0.9.2` (API level unchanged at 2 —
+no schema object changed) and `ExpectedDbInfo.CurrentSchemaVersion` tracks it. The released
+`TigerWrapDb_FullDeploy_v_0.9.1.sql` stays byte-for-byte as shipped and is *not* retro-fitted with
+the guard; `ReleasedArtifactTests` compares every released artifact against its blob in `git HEAD`
+so an in-place edit fails the suite. Because 0.9.2 and 0.9.1 contain the same schema objects at the
+same API level, there is no `0.9.1 -> 0.9.2` upgrade script and a 0.9.1 database needs none;
+`db upgrade` therefore still targets `DbCommandSupport.UpgradeTargetVersion` (`0.9.1`) and its
+`0.9.0 -> 0.9.1` path is unchanged. Generalizing that to a chain stays with the chained-upgrade
+increment.
+
+Exit codes: a refused install returns `InvalidDatabase` (17). The dedicated `DatabaseNotEmpty` code
+is an `[Enum].[ToolkitResponseCode]` row and therefore requires a TigerWrapDb change plus a wrapper
+regeneration — it stays in the batched response-code change, and `db install` moves onto it then.
+No wrapper regeneration was needed for this increment: `[Toolkit].[GetDbInfo]` and its four-output
+contract are untouched.
+
 A menu-visible workflow installing TigerWrapDb into an already-created empty database.
 
 ```text
@@ -345,11 +370,25 @@ Constraints that prepared execution does **not** remove:
 - it does not replace SQL-side guards or transaction logic;
 - it parses the script but does not validate SQL semantics — a script that parses can still fail on its first batch;
 - **preparing the whole chain before executing any of it is parse-only preparation.** It cannot prove step 2 will succeed, because step 2's preconditions do not exist until step 1 commits. The plan's value is that a missing script, an unreadable file, or a malformed sqlcmd structure anywhere in the chain is discovered before the first mutation — not that the chain is transactional. Documentation and the on-screen plan must not imply otherwise.
-- the deployment scripts contain `:on error exit`. Whether TigerQuery honors that directive, and how it interacts with `ContinueOnError = false`, must be confirmed empirically before install and upgrade rely on either. It is currently an untested assumption in a code path whose failure mode is a half-installed database.
+- the deployment scripts contain `:on error exit`. **Now confirmed empirically, and the answer is
+  "no".** With `ExecutionMode = Prepared`, `Mode = SqlCmdEx` and `ContinueOnError = false`, a
+  `RAISERROR` at severity 16 in the full-deploy artifact is surfaced through `OnMessage` with
+  `IsError = true`, but the batch is *not* counted as failed: `ExecutionResult.ResultCode` stays
+  `Success` and `FailedBatches` stays `0`, and every remaining batch is still executed (they merely
+  fail to compile under `SET NOEXEC ON`, producing more error messages). sqlcmd itself does honour
+  `:on error exit` and stops, so the same artifact behaves differently under the two runners.
+
+  Consequence, already applied: **`db install` treats `ScriptRunner.Errors > 0` as a failure**, not
+  only `ResultCode`/`FailedBatches`, and post-execution version verification remains the final
+  backstop. Any future consumer of prepared execution must do the same. This resolves risk R8.
 
 ## Empty-database protection
 
-The current full-install script assumes an empty database and does not verify it. Its pre-deployment section is inert: `:r .\Script.PreUpgradeVersionCheck.sql` is commented out for full-deploy generation. A full deploy today therefore has **no guard at all**.
+**Status: implemented.** Both layers exist and are covered by SQL Server-backed tests.
+
+Before this change the full-install script assumed an empty database and did not verify it: its
+pre-deployment section was inert, because `:r .\Script.PreUpgradeVersionCheck.sql` is commented out
+for full-deploy generation, so a full deploy had **no guard at all**.
 
 0.9.2 adds protection in two places:
 
@@ -385,6 +424,24 @@ Also reject when `compatibility_level < 130`, with a message naming the required
 
 The canonical predicate is a query over `sys.objects` filtered to `is_ms_shipped = 0`, plus `sys.types WHERE is_user_defined = 1`, plus `sys.assemblies WHERE is_user_defined = 1`, plus `sys.schemas` against the TigerWrap-owned list. It is written once and duplicated deliberately in the two places that need it, with a test proving equivalence — a shared implementation is impossible, since one side is a T-SQL script executed with no TigerWrap objects present.
 
+**As implemented**, the shared text lives in `DatabaseEmptinessCheck.ConflictQuery` and in
+`Script.PreInstallEmptyCheck.sql`; `InstallGuardArtifactTests` asserts the two are textually
+identical (and that the full-deploy artifact embeds the same text), and
+`DbInstallLiveTests.CliPreflightAndSqlGuard_AgreeOnTheSameDatabase` asserts they classify the same
+database identically.
+
+Two corrections to the predicate came out of implementation, both verified against SQL Server 2022:
+
+- **Table types are not `sys.objects` rows with `is_ms_shipped = 0`.** A `CREATE TYPE … AS TABLE`
+  produces a `TT` row that is flagged as MS-shipped, so filtering `sys.objects` by type would miss
+  it entirely. Table types are therefore caught by `sys.types WHERE is_user_defined = 1`, which
+  covers both alias and table types, and `'TT'` is deliberately absent from the `sys.objects` type
+  list.
+- **The guard must set `QUOTED_IDENTIFIER ON` itself.** Its diagnostics use
+  `FOR XML PATH(…).value(…)`, which fails with error 1934 under sqlcmd's default
+  `QUOTED_IDENTIFIER OFF`. The generated artifact sets it at the top, but a hand-run of the
+  standalone script does not, so the guard sets it in its own batch.
+
 ### The pre-deployment toggle problem
 
 `Scripts/Script.PreDeployment.sql` carries a manual comment toggle: the upgrade-version-check `:r` is commented out for full-deploy generation and uncommented for upgrade generation. Adding a second, mutually exclusive guard doubles the number of ways a release artifact can be generated wrong — and generating the full deploy with the upgrade guard active, or vice versa, produces a script that either refuses every valid target or protects nothing.
@@ -395,6 +452,20 @@ The canonical predicate is a query over `sys.objects` filtered to `is_ms_shipped
 - object present → this is an upgrade → assert identity and exact source version.
 
 The expected source version stays a per-artifact `:setvar` so the generated upgrade script is still specific to its transition. This removes the manual step entirely and makes both artifacts correct by construction. It is a change to SSDT source and to how release artifacts are generated, so it must be scheduled deliberately and validated by regenerating both artifacts and running them against real databases.
+
+**Status: not adopted in the install increment; the toggle now has two arms instead of one.**
+Runtime mode detection cannot in fact be based on `[DbInfo].[GetName]`: a full install into a
+database that *already* contains TigerWrap objects would detect "upgrade" and skip the emptiness
+assertion, which is exactly the case the guard has to reject. Making detection artifact-based
+instead requires a `:setvar`, which is the same manual step under another name.
+
+What shipped instead: `Script.PreDeployment.sql` documents the two mutually exclusive includes
+explicitly, and the risk is closed by verification rather than by construction —
+`InstallGuardArtifactTests` asserts that the packaged full deploy contains the install guard, that
+the guard's `SET NOEXEC ON` precedes the first `CREATE SCHEMA`, and that the upgrade version check
+is *not* active in it. `BuildInstaller.ps1` fails the installer build if the packaged artifact does
+not contain the guard. R7 is therefore mitigated by test and by build gate, not eliminated; the
+mode-detecting rewrite remains open if a better detection mechanism is found.
 
 ## Upgrade safety philosophy
 
@@ -539,24 +610,29 @@ B. Response-code batch  ─────> C, D   (one DB change; must land before
 
 - define TigerWrap namespaced connection metadata keys and role semantics;
 - add role-filtered connection providers;
-- adopt prepared execution for the existing upgrade path;
-- establish progress-reporting conventions;
+- **done** — adopt prepared execution for the existing upgrade path (`ScriptRunner`, shared by
+  install and upgrade);
+- **done** — establish progress-reporting conventions ("batch N of M" from `ExecutionPlanReady`
+  and `BatchEnd`);
 - implement `db create` and `db drop` with safeguards;
 - replace `TigerWrapDbStatus` with the upgrade-step catalogue and chain resolver;
-- implement `db install` with CLI-side empty-database and capability preflight;
+- **done** — implement `db install` with CLI-side empty-database and capability preflight;
 - add the capability probe with graceful fallback for pre-0.9.2 databases;
-- promote the E2E helpers into a fixture;
-- establish disposable-database naming, ownership, teardown, and orphan sweeping.
+- **done** — promote the E2E helpers into a fixture (`SqlServerTestDatabase`);
+- **done** — establish disposable-database naming (`TWE2E_*`), teardown that never throws over a
+  test failure, and orphan sweeping. Ownership metadata still belongs to the connection-role work.
 
 This is the [Recommended First Implementation Slice](#recommended-first-implementation-slice).
 
 ### Phase 2 — Script tooling and SQL-side guards
 
 - implement `db sqlcmd`;
-- convert `Script.PreDeployment.sql` to a mode-detecting guard;
-- add the SQL-side empty-database and capability guard;
-- prove CLI and SQL emptiness definitions agree;
-- confirm `:on error exit` behavior under TigerQuery;
+- ~~convert `Script.PreDeployment.sql` to a mode-detecting guard~~ — **not adopted**; see
+  [The pre-deployment toggle problem](#the-pre-deployment-toggle-problem);
+- **done** — add the SQL-side empty-database and capability guard
+  (`Script.PreInstallEmptyCheck.sql`, expanded into the new 0.9.2 full-deploy artifact);
+- **done** — prove CLI and SQL emptiness definitions agree (textually and behaviourally);
+- **done** — confirm `:on error exit` behavior under TigerQuery (it is not honoured; see above);
 - add the small populated fixture database used by later E2E journeys.
 
 ### Phase 3 — Response codes and TigerWrapDb 0.9.2 schema
@@ -622,8 +698,8 @@ This is the [Recommended First Implementation Slice](#recommended-first-implemen
 | R4 | `[Toolkit].[CreateProject]` rejects a non-existent `defaultDatabase`, so cross-environment import fails | High — defeats the feature's primary purpose | Certain if unaddressed | Dedicated import write path with an explicit policy. Decision D5. |
 | R5 | Export field set drifts from `[dbo].[Project]`, as `[View].[Project]` already has | High — silent data loss in a feature whose premise is no silent data loss | Medium | Registry-completeness test (Invariant I8); fix `[View].[Project]` in Phase 3. |
 | R6 | `FOR JSON` returned as a bare statement is split into 2033-character rows | Medium — corrupt packages that look plausible | High without discipline | Always assign to `NVARCHAR(MAX)` then `SELECT`; covered by round-trip tests on a large package. |
-| R7 | Pre-deployment comment toggle produces a wrong release artifact | High — either a full deploy with no guard, or an upgrade that refuses everything | Medium | Mode-detecting guard, Phase 2; regenerate and test both artifacts. |
-| R8 | `:on error exit` behavior under TigerQuery is unverified | Medium — a failed batch may not stop a half-installed database | Medium | Empirical confirmation in Phase 2 before install relies on it. |
+| R7 | Pre-deployment comment toggle produces a wrong release artifact | High — either a full deploy with no guard, or an upgrade that refuses everything | Medium | **Mitigated.** `InstallGuardArtifactTests` asserts the packaged full deploy carries the install guard before the first `CREATE SCHEMA` and does not carry the upgrade check; `BuildInstaller.ps1` fails the build otherwise. Mode-detecting rewrite still open. |
+| R8 | `:on error exit` behavior under TigerQuery is unverified | Medium — a failed batch may not stop a half-installed database | Medium | **Resolved (negative result).** TigerQuery does not stop on it; errors surface only as `IsError` messages. `db install` fails on `Errors > 0` and verifies the installed version afterwards. |
 | R9 | Connection metadata cannot be authored from the CLI in 0.8.2 | Medium — E2E flows and user-facing role tagging are limited | Certain | Programmatic-only in 0.9.2; revisit when TigerQuery surfaces `--metadata`. |
 | R10 | `db drop` destroys a real database | Critical | Low with safeguards | Layered safeguards; disposable metadata; `--force` and `--force-disconnect` opt-ins; system-database refusal. |
 | R11 | New exit codes each require a DB change plus wrapper regeneration | Medium — churn and mismatched CLI/DB versions | High | Batch all new response codes in one Phase 3 change. |
@@ -803,7 +879,7 @@ The spine is the right size because it is where the release's dependencies conve
 - `ApiLevel` changes.
 - Documentation rewrites beyond command help text.
 
-**Boundary note on `db install`.** Because this slice changes no SQL, the only full-deploy artifact available is `TigerWrapDb_FullDeploy_v_0.9.1.sql`, which has no internal guard. `db install` is therefore tested by installing 0.9.1 into an empty database, and its preflight is the only emptiness protection until Phase 2. This is a deliberate, temporary asymmetry and must be recorded in the command's help text, not silently accepted.
+**Boundary note on `db install`.** ~~Because this slice changes no SQL, the only full-deploy artifact available is `TigerWrapDb_FullDeploy_v_0.9.1.sql`, which has no internal guard.~~ **Superseded.** The install increment shipped the SQL-side guard together with the command, so the asymmetry never existed — but it *does* change SQL, and therefore the TigerWrapDb version: the guard went into a newly generated `TigerWrapDb_FullDeploy_v_0.9.2.sql`, the released `0.9.1` artifact was left exactly as shipped, and `db install` is tested by installing 0.9.2 into an empty database with both layers active.
 
 ### Acceptance criteria for the slice
 
@@ -811,7 +887,7 @@ The slice is done when all of the following hold, verified against a real local 
 
 1. `db create` creates a database from an administrative connection, rejects invalid names, refuses a regular-role connection, and reports the created database's collation and compatibility level.
 2. `db drop` refuses: a system database; a database with no disposable-tagged connection and no `--force`; the database its own connection targets; a non-interactive run without `--confirm`. It succeeds for a disposable-tagged database and does not force-disconnect unless `--force-disconnect` is supplied.
-3. `db install` installs 0.9.1 into an empty database and verifies the resulting version and API level.
+3. `db install` installs 0.9.2 into an empty database and verifies the resulting version and API level.
 4. `db install` refuses a database containing any user object, naming counts and sample objects.
 5. `db install` refuses a database whose compatibility level is below 130, naming the required `ALTER DATABASE` statement.
 6. `db install` refuses an `Administrative`-role connection.

@@ -46,13 +46,17 @@ public sealed class TigerWrapAppTests
 
         Assert.Equal(0, result.ExitCode);
         Assert.Contains("db", result.StdOut);
-        Assert.Contains("Inspect and upgrade a TigerWrap database", result.StdOut);
+        Assert.Contains("Install, inspect and upgrade a TigerWrap database", result.StdOut);
     }
 
     [Theory]
     [InlineData("db", "info")]
+    [InlineData("db", "install")]
     [InlineData("db", "upgrade")]
     [InlineData("db info", "Saved TigerWrap database connection")]
+    [InlineData("db install", "empty database that will receive TigerWrapDb")]
+    [InlineData("db install", "--confirm")]
+    [InlineData("db install", "--sql-folder")]
     [InlineData("db upgrade", "--backup-confirmed")]
     [InlineData("db upgrade", "--sql-folder")]
     public async Task DbCommandHelp_IsRegistered(string commandPath, string expectedText)
@@ -95,6 +99,47 @@ public sealed class TigerWrapAppTests
         Assert.NotNull(spec.GetRow("elapsed"));
         Assert.Contains("0.9.0", spec.NonInteractiveMessage);
         Assert.Contains("0.9.1", spec.NonInteractiveMessage);
+    }
+
+    [Fact]
+    public void DbInstall_ActivitySpec_BuildsWithExpectedRows()
+    {
+        var spec = DbInstallCommand.CreateActivitySpec(new DbInstallCommand.Settings(), "TigerWrapDb");
+
+        Assert.NotNull(spec.GetRow("status"));
+        Assert.NotNull(spec.GetRow("batches"));
+        Assert.NotNull(spec.GetRow("issues"));
+        Assert.NotNull(spec.GetRow("elapsed"));
+        Assert.Contains("TigerWrapDb", spec.NonInteractiveMessage);
+        Assert.Contains(ExpectedDbInfo.CurrentSchemaVersion, spec.NonInteractiveMessage);
+    }
+
+    [Fact]
+    public void DbInstall_IsVisibleInTheCommandMenu()
+    {
+        var app = TigerWrapApp.Build(CreateStore());
+
+        var install = FindCommandRegistration(app, "db", "install");
+        var info = FindCommandRegistration(app, "db", "info");
+
+        // db install is a normal user workflow: it stays in the menu, unlike the
+        // script-oriented commands that opt out with CommandMenuMode.Disabled.
+        var installMenuMode = GetRegistrationProperty<CommandMenuMode>(install, "CommandMenuMode");
+        Assert.NotEqual(CommandMenuMode.Disabled, installMenuMode);
+        Assert.Equal(GetRegistrationProperty<CommandMenuMode>(info, "CommandMenuMode"), installMenuMode);
+    }
+
+    [Fact]
+    public void DbInstall_UsesProviderBackedConnectionSelectionAndExplicitFlags()
+    {
+        var connection = GetArgument<DbInstallCommand.Settings>(nameof(DbInstallCommand.Settings.ConnectionName));
+        var confirmed = GetOption<DbInstallCommand.Settings>(nameof(DbInstallCommand.Settings.Confirmed));
+        var sqlFolder = GetOption<DbInstallCommand.Settings>(nameof(DbInstallCommand.Settings.SqlFolder));
+
+        Assert.Equal("connections", connection.Provider);
+        Assert.True(connection.AutoSelectSingleChoice);
+        Assert.Equal(TigerCliPromptable.No, confirmed.Promptable);
+        Assert.Equal(TigerCliPromptable.No, sqlFolder.Promptable);
     }
 
     [Theory]

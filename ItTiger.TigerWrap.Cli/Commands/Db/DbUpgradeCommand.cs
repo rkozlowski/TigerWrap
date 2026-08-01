@@ -1,13 +1,10 @@
-using System.Diagnostics;
-using ItTiger.TigerCli.Commands;
+﻿using ItTiger.TigerCli.Commands;
 using ItTiger.TigerCli.Enums;
 using ItTiger.TigerCli.Rendering;
 using ItTiger.TigerCli.Terminal;
 using ItTiger.TigerCli.Tui;
 using ItTiger.TigerCli.Tui.Activity;
-using ItTiger.TigerQuery;
 using ItTiger.TigerQuery.Engine;
-using ItTiger.TigerQuery.Events;
 using ItTiger.TigerQuery.Core;
 using ItTiger.TigerWrap.Core;
 using Microsoft.Data.SqlClient;
@@ -19,8 +16,6 @@ namespace ItTiger.TigerWrap.Cli.Commands.Db;
 public sealed class DbUpgradeCommand(SqlServerConnectionStore connectionStore)
     : TigerCliAsyncCommandHandler<DbUpgradeCommand.Settings>
 {
-    private const int MaxIssuesShown = 10;
-
     public sealed class Settings : TigerCliSettings
     {
         [TigerCliArgument(0,
@@ -43,25 +38,7 @@ public sealed class DbUpgradeCommand(SqlServerConnectionStore connectionStore)
         public string? SqlFolder { get; set; }
     }
 
-    private sealed class UpgradeProgress
-    {
-        private readonly object _lock = new();
-
-        public int CompletedBatches;
-        public int Warnings;
-        public int Errors;
-        public string LastStatus = "Starting upgrade...";
-        public readonly List<SqlCmdMessage> Issues = [];
-        public readonly Stopwatch Elapsed = Stopwatch.StartNew();
-
-        public void Record(Action action)
-        {
-            lock (_lock)
-            {
-                action();
-            }
-        }
-    }
+    private const string InitialStatus = "Starting upgrade...";
 
     public override async Task<int> ExecuteAsync(Settings s)
     {
@@ -116,10 +93,12 @@ public sealed class DbUpgradeCommand(SqlServerConnectionStore connectionStore)
                     break;
 
                 case TigerWrapDbStatus.Current:
+                    // The database's own version, not a constant: this branch also covers a
+                    // database that is at DbCommandSupport.UpgradeTargetVersion.
                     TigerConsole.MarkupLine(s.E(
                         "[Success]Database [Key]{0}[/] is already at version {1}. Nothing to upgrade.[/]",
                         databaseName,
-                        ExpectedDbInfo.CurrentSchemaVersion));
+                        info.Version));
                     return (int)ToolkitResponseCode.Ok;
 
                 case TigerWrapDbStatus.NewerThanTool:
@@ -133,7 +112,7 @@ public sealed class DbUpgradeCommand(SqlServerConnectionStore connectionStore)
                     return Fail(
                         ToolkitResponseCode.InvalidDatabase,
                         $"Database version {info.Version ?? "<unknown>"} cannot be upgraded by this tool. "
-                            + $"Only {DbCommandSupport.UpgradeSourceVersion} -> {ExpectedDbInfo.CurrentSchemaVersion} is supported; "
+                            + $"Only {DbCommandSupport.UpgradeSourceVersion} -> {DbCommandSupport.UpgradeTargetVersion} is supported; "
                             + "older versions must be upgraded manually first (see docs/INSTALL.md).",
                         s);
             }
@@ -160,7 +139,7 @@ public sealed class DbUpgradeCommand(SqlServerConnectionStore connectionStore)
                 .Add(s.T("Server:"), builder.DataSource)
                 .Add(s.T("Database:"), databaseName)
                 .Add(s.T("Current version:"), info.Version)
-                .Add(s.T("Target version:"), ExpectedDbInfo.CurrentSchemaVersion)
+                .Add(s.T("Target version:"), DbCommandSupport.UpgradeTargetVersion)
                 .Add(s.T("Upgrade script:"), scriptPath));
 
             // 5./6./7. Backup warning and confirmation.
@@ -170,10 +149,10 @@ public sealed class DbUpgradeCommand(SqlServerConnectionStore connectionStore)
                 return (int)confirmation.Value;
             }
 
-            // 8.-12. Execute the script through TigerQuery in SqlCmdEx mode.
-            var progress = new UpgradeProgress();
-            var (execution, exitCode) = await ExecuteUpgradeAsync(s, connectionString, databaseName, scriptPath, progress);
-            RenderIssues(s, progress);
+            // 8.-12. Execute the script through TigerQuery in prepared SqlCmdEx mode.
+            var runner = new ScriptRunner(s, InitialStatus);
+            var (execution, exitCode) = await ExecuteUpgradeAsync(s, connectionString, databaseName, scriptPath, runner);
+            runner.RenderIssues();
 
             if (exitCode != null)
             {
@@ -191,7 +170,7 @@ public sealed class DbUpgradeCommand(SqlServerConnectionStore connectionStore)
             }
 
             // 13./14. Re-check the database and require the target version and API levels.
-            return await VerifyUpgradeAsync(s, connectionString, databaseName, info.Version, execution, progress);
+            return await VerifyUpgradeAsync(s, connectionString, databaseName, info.Version, execution, runner);
         }
         catch (Exception ex)
         {
@@ -240,7 +219,7 @@ public sealed class DbUpgradeCommand(SqlServerConnectionStore connectionStore)
         string connectionString,
         string databaseName,
         string scriptPath,
-        UpgradeProgress progress)
+        ScriptRunner runner)
     {
         if (s.InteractionMode == TigerCliInteractionMode.NonInteractive)
         {
@@ -248,8 +227,8 @@ public sealed class DbUpgradeCommand(SqlServerConnectionStore connectionStore)
                 "Upgrading [Key]{0}[/] from {1} to {2}...",
                 databaseName,
                 DbCommandSupport.UpgradeSourceVersion,
-                ExpectedDbInfo.CurrentSchemaVersion));
-            var execution = await RunEngineAsync(s, connectionString, databaseName, scriptPath, progress, context: null, CancellationToken.None);
+                DbCommandSupport.UpgradeTargetVersion));
+            var execution = await runner.RunAsync(connectionString, databaseName, scriptPath, context: null, CancellationToken.None);
             return (execution, null);
         }
 
@@ -258,7 +237,7 @@ public sealed class DbUpgradeCommand(SqlServerConnectionStore connectionStore)
         var activityResult = await TigerTui.RunActivityAsync(
             "Upgrading TigerWrapDb",
             spec,
-            (ctx, ct) => RunEngineAsync(s, connectionString, databaseName, scriptPath, progress, ctx, ct),
+            (ctx, ct) => runner.RunAsync(connectionString, databaseName, scriptPath, ctx, ct),
             ActivityStopMode.Cancel);
 
         if (activityResult.Outcome == ActivityOutcome.Failed && activityResult.Exception is not null)
@@ -289,147 +268,15 @@ public sealed class DbUpgradeCommand(SqlServerConnectionStore connectionStore)
 
     internal static ActivityDialogSpec CreateActivitySpec(Settings s, string databaseName)
     {
-        return ActivityDialogSpec.Create()
-            .AddColumn(width: 10)
-            .AddColumn(sizing: CliColumnSizing.Star)
-            .AddRow("status", row => row.Cell(0, 2).Text("{0}").Values("Starting upgrade..."))
-            .AddRow("batches", row => row.Cell(0).Text(s.T("Batches:")).Cell(1).Text("{0} completed").Values(0))
-            .AddRow("issues", row => row.Cell(0).Text(s.T("Issues:")).Cell(1).Text("{0} warning(s), {1} error(s)").Values(0, 0))
-            .AddRow("elapsed", row => row.Cell(0).Text(s.T("Elapsed:")).Cell(1).Text("{0}").Values("00:00"))
-            .SetNonInteractiveMessage(s.E(
+        return ScriptRunner.CreateActivitySpec(
+            s,
+            s.T("Batches:"),
+            s.E(
                 "Upgrading {0} from {1} to {2}...",
                 databaseName,
                 DbCommandSupport.UpgradeSourceVersion,
-                ExpectedDbInfo.CurrentSchemaVersion))
-            .Build();
-    }
-
-    private static async Task<ExecutionResult> RunEngineAsync(
-        Settings s,
-        string connectionString,
-        string databaseName,
-        string scriptPath,
-        UpgradeProgress progress,
-        ActivityContext? context,
-        CancellationToken cancellationToken)
-    {
-        var options = new TigerQueryEngineOptions
-        {
-            ConnectionString = connectionString,
-            Mode = SqlCmdMode.SqlCmdEx,
-            ContinueOnError = false,
-            // Injected variables take precedence over the script's own :setvar values, so the
-            // upgrade targets the connection's actual database even if it is not named TigerWrapDb.
-            Variables = new Dictionary<string, string> { ["DatabaseName"] = databaseName },
-            OnMessage = (message, _) => HandleMessage(s, message, progress, context),
-            OnBatchEnd = end => HandleBatchEnd(end, progress, context)
-        };
-
-        var engine = new TigerQueryEngine(options);
-        return await engine.RunFromFileAsync(scriptPath, cancellationToken: cancellationToken);
-    }
-
-    private static void HandleMessage(Settings s, SqlCmdMessage message, UpgradeProgress progress, ActivityContext? context)
-    {
-        var text = message.Text?.Trim();
-
-        progress.Record(() =>
-        {
-            if (message.IsError)
-            {
-                progress.Errors++;
-                progress.Issues.Add(message);
-            }
-            else if (message.Type == SqlCmdMessageType.Warning)
-            {
-                progress.Warnings++;
-                progress.Issues.Add(message);
-            }
-            else if (!string.IsNullOrEmpty(text))
-            {
-                progress.LastStatus = text;
-            }
-        });
-
-        if (context is not null)
-        {
-            UpdateActivity(progress, context);
-        }
-        else if (!string.IsNullOrEmpty(text))
-        {
-            // Non-interactive: linear per-message diagnostics.
-            if (message.IsError)
-            {
-                TigerConsole.MarkupErrorLine(s.E("{0}", FormatIssue(message)));
-            }
-            else if (message.Type == SqlCmdMessageType.Warning)
-            {
-                TigerConsole.MarkupLine(s.E("[Warning]{0}[/]", FormatIssue(message)));
-            }
-            else
-            {
-                TigerConsole.MarkupLine(s.E("[Muted]{0}[/]", text));
-            }
-        }
-    }
-
-    private static void HandleBatchEnd(BatchEnd end, UpgradeProgress progress, ActivityContext? context)
-    {
-        progress.Record(() =>
-        {
-            if (end.Success)
-            {
-                progress.CompletedBatches++;
-            }
-        });
-
-        if (context is not null)
-        {
-            UpdateActivity(progress, context);
-        }
-    }
-
-    private static void UpdateActivity(UpgradeProgress progress, ActivityContext context)
-    {
-        progress.Record(() =>
-        {
-            context.SetMessage("status", progress.LastStatus);
-            context.SetValues("batches", progress.CompletedBatches);
-            context.SetValues("issues", progress.Warnings, progress.Errors);
-            context.SetMessage("elapsed", progress.Elapsed.Elapsed.ToString(@"mm\:ss"));
-        });
-    }
-
-    private static void RenderIssues(Settings s, UpgradeProgress progress)
-    {
-        // Non-interactive mode already printed every issue linearly.
-        if (s.InteractionMode == TigerCliInteractionMode.NonInteractive || progress.Issues.Count == 0)
-        {
-            return;
-        }
-
-        foreach (var issue in progress.Issues.Take(MaxIssuesShown))
-        {
-            if (issue.IsError)
-            {
-                TigerConsole.MarkupErrorLine(s.E("{0}", FormatIssue(issue)));
-            }
-            else
-            {
-                TigerConsole.MarkupLine(s.E("[Warning]{0}[/]", FormatIssue(issue)));
-            }
-        }
-
-        if (progress.Issues.Count > MaxIssuesShown)
-        {
-            TigerConsole.MarkupLine(s.E("[Muted]...and {0} more issue(s).[/]", progress.Issues.Count - MaxIssuesShown));
-        }
-    }
-
-    private static string FormatIssue(SqlCmdMessage message)
-    {
-        var location = message.LineNumber.HasValue ? $" (line {message.LineNumber})" : "";
-        return $"{message.Type}{location}: {message.Text}";
+                DbCommandSupport.UpgradeTargetVersion),
+            InitialStatus);
     }
 
     private async Task<int> VerifyUpgradeAsync(
@@ -438,7 +285,7 @@ public sealed class DbUpgradeCommand(SqlServerConnectionStore connectionStore)
         string databaseName,
         string? versionBefore,
         ExecutionResult execution,
-        UpgradeProgress progress)
+        ScriptRunner runner)
     {
         var verify = await DbCommandSupport.ProbeAsync(connectionString);
         if (verify.Error is not null)
@@ -451,7 +298,7 @@ public sealed class DbUpgradeCommand(SqlServerConnectionStore connectionStore)
 
         var info = verify.Info!;
         var upgraded =
-            string.Equals(info.Version, ExpectedDbInfo.CurrentSchemaVersion, StringComparison.OrdinalIgnoreCase)
+            string.Equals(info.Version, DbCommandSupport.UpgradeTargetVersion, StringComparison.OrdinalIgnoreCase)
             && info.ApiLevel == ExpectedDbInfo.MaxApiLevel
             && info.MinApiLevel == ExpectedDbInfo.MinApiLevel;
 
@@ -461,7 +308,7 @@ public sealed class DbUpgradeCommand(SqlServerConnectionStore connectionStore)
                 ToolkitResponseCode.DbError,
                 $"The upgrade script finished, but the database reports version {info.Version ?? "<unknown>"} "
                     + $"(API level {info.ApiLevel?.ToString() ?? "?"}, minimum {info.MinApiLevel?.ToString() ?? "?"}) "
-                    + $"instead of {ExpectedDbInfo.CurrentSchemaVersion} (API level {ExpectedDbInfo.MaxApiLevel}). "
+                    + $"instead of {DbCommandSupport.UpgradeTargetVersion} (API level {ExpectedDbInfo.MaxApiLevel}). "
                     + "The script's own database/version guards may have prevented the upgrade. "
                     + "Review the messages above and verify the database before using it.",
                 s);
@@ -475,8 +322,8 @@ public sealed class DbUpgradeCommand(SqlServerConnectionStore connectionStore)
             .Add(s.T("Version:"), $"{versionBefore} -> {info.Version}")
             .Add(s.T("API level:"), info.ApiLevel)
             .Add(s.T("Minimum API level:"), info.MinApiLevel)
-            .Add(s.T("Batches executed:"), execution.ExecutedBatches)
-            .Add(s.T("Warnings:"), progress.Warnings)
+            .Add(s.T("Batches executed:"), $"{execution.ExecutedBatches} of {runner.TotalBatches?.ToString() ?? "?"}")
+            .Add(s.T("Warnings:"), runner.Warnings)
             .Add(s.T("Duration:"), $"{execution.TotalDuration.TotalSeconds:F1}s"));
 
         return (int)ToolkitResponseCode.Ok;
