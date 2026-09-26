@@ -21,7 +21,7 @@ public sealed class DbCommandsLiveTests
         await SqlServerTestDatabase.SkipUnlessAvailableAsync();
 
         var store = SqlServerTestDatabase.CreateConnectionStore("probe", "master");
-        var app = TigerWrapApp.Build(store);
+        var app = TestApps.Build(store);
 
         var result = await TigerCliAppTestHost
             .For(app)
@@ -45,7 +45,7 @@ public sealed class DbCommandsLiveTests
         await database.DeployAsync("TigerWrapDb_FullDeploy_v_0.9.0.sql");
 
         var store = database.CreateConnectionStore("upgrade-test");
-        var app = TigerWrapApp.Build(store);
+        var app = TestApps.Build(store);
 
         // db info reports the upgrade opportunity.
         var info = await TigerCliAppTestHost

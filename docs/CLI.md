@@ -53,6 +53,14 @@ TigerWrap needs a place to store project definitions, enum mappings, and code ge
 
 You can register multiple connections if you work across different environments.
 
+Connections are saved in TigerWrap's connection-store file: `%AppData%\ItTiger.net\TigerWrap\connections.json` on Windows, `~/.config/ItTiger.net/TigerWrap/connections.json` elsewhere. Stored SQL passwords are encrypted for the current Windows user.
+
+To use a different connection-store file for one run — for example an isolated store for automation — pass `--tq-connection-store-file <path>` after the command, or set the `TIGERQUERY_CONNECTION_STORE_FILE` environment variable. The option wins over the variable, and either one replaces the default file for every command in that run; TigerWrap never falls back to the default file when the selected one is unusable.
+
+```bash
+tiger-wrap connection list --tq-connection-store-file C:\Temp\ci-connections.json
+```
+
 ---
 
 ### 📁 Project
@@ -180,6 +188,20 @@ tiger-wrap db upgrade MyLocalTigerWrap --backup-confirmed --non-interactive
 ```
 
 Databases older than `0.9.0` must first be upgraded manually with the released scripts (see [INSTALL.md](./INSTALL.md)).
+
+### Run a SQL script (automation)
+
+```bash
+tiger-wrap db sqlcmd MyTestDb --file Populate.sql --mode SqlCmdEx --non-interactive
+```
+
+Executes a SQL script file against any saved connection — it does not have to be a TigerWrap database — using the SQL engine built into TigerWrap; no separate `sqlcmd` or `tiger-sqlcmd` installation is needed. It is meant for scripts and automation, such as preparing test databases, so it does not appear in the interactive menu.
+
+- `--mode` selects the parser: `SqlCmd` (default) supports `GO`, `:setvar`, `$(var)`, and `:on error`; `SqlCmdEx` is the automation variant TigerWrap uses for its own deployment scripts; `Normal` accepts only T-SQL and `GO`.
+- `--command-timeout <seconds>` limits each batch (`0` = no limit; default 30 seconds).
+- The script is parsed completely before the connection is opened, and progress is shown per batch. Result sets are not displayed.
+- Any failed batch makes the command fail (exit code `1`). Like `sqlcmd`, later batches still run unless the script contains `:on error exit`, which stops at the first error.
+- The connection comes from the same connection store as every other command, including `--tq-connection-store-file`.
 
 ---
 

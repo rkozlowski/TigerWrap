@@ -12,9 +12,10 @@ using ActivityContext = ItTiger.TigerCli.Tui.Activity.ActivityContext;
 namespace ItTiger.TigerWrap.Cli.Commands.Db;
 
 /// <summary>
-/// Runs a packaged TigerWrapDb deployment script through TigerQuery in
-/// <see cref="TigerQueryExecutionMode.Prepared"/> mode and turns the engine's execution plan
-/// and batch events into "batch N of M" progress.
+/// Runs a SQL script file through TigerQuery in <see cref="TigerQueryExecutionMode.Prepared"/>
+/// mode and turns the engine's execution plan and batch events into "batch N of M" progress.
+/// Used for the packaged TigerWrapDb deployment scripts (<c>db install</c>, <c>db upgrade</c>)
+/// and for arbitrary scripts (<c>db sqlcmd</c>).
 /// <para>
 /// Prepared mode parses the whole sqlcmd structure - including <c>:r</c> includes and
 /// <c>:setvar</c> - before the connection is opened, so a malformed script fails before the
@@ -47,7 +48,7 @@ internal sealed class ScriptRunner(TigerCliSettings settings, string initialStat
 
     public IReadOnlyList<SqlCmdMessage> Issues => _issues;
 
-    /// <summary>Builds the shared activity layout used by <c>db install</c> and <c>db upgrade</c>.</summary>
+    /// <summary>Builds the shared activity layout used by the script-running <c>db</c> commands.</summary>
     public static ActivityDialogSpec CreateActivitySpec(
         TigerCliSettings settings,
         string batchesLabel,
@@ -65,6 +66,10 @@ internal sealed class ScriptRunner(TigerCliSettings settings, string initialStat
             .Build();
     }
 
+    /// <summary>
+    /// Runs a packaged TigerWrapDb deployment script: SqlCmdEx mode, stop at the first failed
+    /// batch, and <c>$(DatabaseName)</c> bound to the connection's database.
+    /// </summary>
     public async Task<ExecutionResult> RunAsync(
         string connectionString,
         string databaseName,
@@ -81,6 +86,35 @@ internal sealed class ScriptRunner(TigerCliSettings settings, string initialStat
             // Injected variables take precedence over the script's own :setvar values, so the
             // script targets the connection's actual database even if it is not named TigerWrapDb.
             Variables = new Dictionary<string, string> { ["DatabaseName"] = databaseName },
+            OnExecutionPlanReady = plan => HandlePlanReady(plan, context),
+            OnMessage = (message, _) => HandleMessage(message, context),
+            OnBatchEnd = end => HandleBatchEnd(end, context)
+        };
+
+        var engine = new TigerQueryEngine(options);
+        return await engine.RunFromFileAsync(scriptPath, cancellationToken: cancellationToken);
+    }
+
+    /// <summary>
+    /// Runs an arbitrary script with TigerQuery's own execution semantics: only the parser mode
+    /// and the per-batch command timeout are chosen by the caller. Continue-on-error keeps the
+    /// engine default, so the script's <c>:on error</c> directive decides whether later batches
+    /// run; the result is not <see cref="ExecutionResultCode.Success"/> once any batch failed.
+    /// </summary>
+    public async Task<ExecutionResult> RunScriptAsync(
+        string connectionString,
+        string scriptPath,
+        SqlCmdMode mode,
+        int? commandTimeoutSeconds,
+        ActivityContext? context,
+        CancellationToken cancellationToken)
+    {
+        var options = new TigerQueryEngineOptions
+        {
+            ConnectionString = connectionString,
+            ExecutionMode = TigerQueryExecutionMode.Prepared,
+            Mode = mode,
+            CommandTimeoutSeconds = commandTimeoutSeconds,
             OnExecutionPlanReady = plan => HandlePlanReady(plan, context),
             OnMessage = (message, _) => HandleMessage(message, context),
             OnBatchEnd = end => HandleBatchEnd(end, context)
@@ -220,9 +254,14 @@ internal sealed class ScriptRunner(TigerCliSettings settings, string initialStat
         }
     }
 
-    private static string FormatIssue(SqlCmdMessage message)
+    internal static string FormatIssue(SqlCmdMessage message)
     {
+        // TigerQuery names severity 11-16 "Warning", but it counts them as errors and they fail
+        // the batch, so they are labelled as errors here.
+        var label = message.Type == SqlCmdMessageType.Warning && message.IsError
+            ? "Error"
+            : message.Type.ToString();
         var location = message.LineNumber.HasValue ? $" (line {message.LineNumber})" : "";
-        return $"{message.Type}{location}: {message.Text}";
+        return $"{label}{location}: {message.Text}";
     }
 }

@@ -17,10 +17,16 @@ namespace ItTiger.TigerWrap.Core
             return SqlServerConnectionStoreOptions.AppSpecific(VendorName, AppName);
         }
 
-        public static SqlServerConnectionStore CreateDefaultConnectionStore()
+        /// <summary>
+        /// Returns TigerWrap's default connection-store file path, creating its folder (and the
+        /// sibling <c>logs</c> folder) when missing. The store itself is constructed per run by
+        /// TigerQuery, which may select another file explicitly.
+        /// </summary>
+        public static string PrepareDefaultConnectionStoreFile()
         {
-            var options = CreateDefaultConnectionStoreOptions();
-            return CreateConnectionStore(options, ensureDirectories: true);
+            var filePath = CreateDefaultConnectionStoreOptions().FilePath;
+            EnsureConnectionStoreDirectories(filePath);
+            return filePath;
         }
 
         public static SqlServerConnectionStore CreateConnectionStore(

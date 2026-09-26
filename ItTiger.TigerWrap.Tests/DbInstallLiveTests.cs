@@ -276,7 +276,7 @@ public sealed class DbInstallLiveTests
         SqlServerTestDatabase database,
         params string[] extraArgs)
     {
-        var app = TigerWrapApp.Build(database.CreateConnectionStore(ConnectionName));
+        var app = TestApps.Build(database.CreateConnectionStore(ConnectionName));
 
         string[] args =
         [

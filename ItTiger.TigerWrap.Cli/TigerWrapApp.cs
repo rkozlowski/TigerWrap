@@ -20,15 +20,27 @@ internal static class TigerWrapApp
 {
     public static TigerCliApp Create()
     {
-        return Build(ToolkitHelper.CreateDefaultConnectionStore());
+        return Build(new TigerQueryCliOptions
+        {
+            DefaultConnectionStoreFile = ToolkitHelper.PrepareDefaultConnectionStoreFile()
+        });
     }
 
-    internal static TigerCliApp Build(SqlServerConnectionStore connectionStore)
+    /// <summary>
+    /// Builds the app over one shared TigerQuery configuration. The run's connection store is
+    /// selected by <see cref="TigerQueryCliContribution"/> (<c>--tq-connection-store-file</c>,
+    /// then the TigerQuery environment variable, then the TigerWrap default file) before any
+    /// provider or command factory runs, so every store access below is deferred to run time.
+    /// </summary>
+    internal static TigerCliApp Build(TigerQueryCliOptions tigerQuery)
     {
+        ArgumentNullException.ThrowIfNull(tigerQuery);
+
         TigerConsole.CurrentTheme = new TigerBlueTheme();
 
-        return TigerCliApp.CreateBuilder()            
+        return TigerCliApp.CreateBuilder()
             .UseAssemblyMetadata(typeof(TigerWrapApp).Assembly)
+            .AddContribution(new TigerQueryCliContribution(tigerQuery))
             .UseExitCodes<ToolkitResponseCode>(
                 ToolkitResponseCode.Ok,
                 ToolkitResponseCode.TigerCliGenericFail)
@@ -41,13 +53,13 @@ internal static class TigerWrapApp
             .ConfigureProviders(providers =>
                 providers.Add(
                     "connections",
-                    ctx => connectionStore.GetConnectionNamesAsync(ctx.CancellationToken)))
+                    ctx => tigerQuery.Store.GetConnectionNamesAsync(ctx.CancellationToken)))
             .AddCommandGroup("connection", group =>
             {
                 group.SetDescription("Manage TigerWrap database connections.");
                 SqlServerConnectionCommands.Configure(group, options =>
                 {
-                    options.Store = connectionStore;
+                    options.TigerQuery = tigerQuery;
                     options.ValidationPolicy = SqlServerConnectionValidationPolicy.DatabaseRequired;
                 });
             })
@@ -56,25 +68,30 @@ internal static class TigerWrapApp
                 group.SetDescription("Install, inspect and upgrade a TigerWrap database.");
                 group.AddCommand(
                     "info",
-                    () => new DbInfoCommand(connectionStore),
+                    () => new DbInfoCommand(tigerQuery.Store),
                     "Show TigerWrap database version, API level and compatibility.");
                 group.AddCommand(
                     "install",
-                    () => new DbInstallCommand(connectionStore),
+                    () => new DbInstallCommand(tigerQuery.Store),
                     $"Install TigerWrapDb {ExpectedDbInfo.CurrentSchemaVersion} into an existing empty database.");
                 group.AddCommand(
                     "upgrade",
-                    () => new DbUpgradeCommand(connectionStore),
+                    () => new DbUpgradeCommand(tigerQuery.Store),
                     $"Upgrade a TigerWrap database ({DbCommandSupport.UpgradeSourceVersion} -> {DbCommandSupport.UpgradeTargetVersion}).");
+                group.AddCommand(
+                    "sqlcmd",
+                    () => new DbSqlCmdCommand(tigerQuery.Store),
+                    command => command.CommandMenu(CommandMenuMode.Disabled),
+                    "Execute a SQL script file against a saved connection (for scripts and automation).");
             })
             .AddCommand(
                 "languages-list",
-                () => new LanguagesListCommand(connectionStore),
+                () => new LanguagesListCommand(tigerQuery.Store),
                 command => command.CommandMenu(CommandMenuMode.Disabled),
                 "List languages supported by a TigerWrap database.")
             .AddCommand(
                 "generate-code",
-                () => new GenerateCodeCommand(connectionStore),
+                () => new GenerateCodeCommand(tigerQuery.Store),
                 command => command
                     .SetPromptMode(TigerCliPromptMode.RequiredOnly)
                     .CommandMenu(CommandMenuMode.Disabled),
@@ -84,53 +101,53 @@ internal static class TigerWrapApp
                 group.SetDescription("View and manage TigerWrap projects.");
                 group.AddAsyncProvider<string>(
                     "projects",
-                    ctx => ProjectCommandProviders.GetProjectChoicesAsync(connectionStore, ctx),
+                    ctx => ProjectCommandProviders.GetProjectChoicesAsync(tigerQuery.Store, ctx),
                     configure: options => options.EmptyMessage("No projects were found for the selected connection."));
                 group.AddCommand(
                     "list",
-                    () => new ProjectsListCommand(connectionStore),
+                    () => new ProjectsListCommand(tigerQuery.Store),
                     command => command.AddAsyncProvider<ToolkitDbHelper.Language>(
                         "languages",
-                        ctx => ProjectCommandProviders.GetLanguageChoicesAsync(connectionStore, ctx),
+                        ctx => ProjectCommandProviders.GetLanguageChoicesAsync(tigerQuery.Store, ctx),
                         configure: options => options.EmptyMessage("No languages were found for the selected connection.")),
                     "List projects.");
                 group.AddCommand(
                     "show",
-                    () => new ProjectsShowCommand(connectionStore),
+                    () => new ProjectsShowCommand(tigerQuery.Store),
                     "Show project details.");
                 group.AddCommand(
                     "add",
-                    () => new ProjectsAddCommand(connectionStore),
+                    () => new ProjectsAddCommand(tigerQuery.Store),
                     command => command
                         .AddAsyncProvider<ToolkitDbHelper.Language>(
                             "languages",
-                            ctx => ProjectCommandProviders.GetLanguageChoicesAsync(connectionStore, ctx),
+                            ctx => ProjectCommandProviders.GetLanguageChoicesAsync(tigerQuery.Store, ctx),
                             configure: options => options.EmptyMessage("No languages were found for the selected connection."))
                         .AddAsyncProvider<string>(
                             "databases",
-                            ctx => ProjectCommandProviders.GetDatabaseChoicesAsync(connectionStore, ctx),
+                            ctx => ProjectCommandProviders.GetDatabaseChoicesAsync(tigerQuery.Store, ctx),
                             configure: options => options.EmptyMessage("No databases were found for the selected connection."))
                         .AddAsyncProvider<ProjectsAddCommand.Settings, long>(
                             "language-options",
                             (settings, ctx) => ProjectCommandProviders.GetLanguageOptionChoicesAsync(
-                                connectionStore,
+                                tigerQuery.Store,
                                 settings,
                                 ctx)),
                     "Add project.");
                 group.AddCommand(
                     "update",
-                    () => new ProjectsUpdateCommand(connectionStore),
+                    () => new ProjectsUpdateCommand(tigerQuery.Store),
                     command => command
                         .AsEdit<ProjectsUpdateCommand.Settings>(
-                            settings => ProjectsUpdateCommand.LoadAsync(connectionStore, settings))
+                            settings => ProjectsUpdateCommand.LoadAsync(tigerQuery.Store, settings))
                         .AddAsyncProvider<string>(
                             "databases",
-                            ctx => ProjectCommandProviders.GetDatabaseChoicesAsync(connectionStore, ctx),
+                            ctx => ProjectCommandProviders.GetDatabaseChoicesAsync(tigerQuery.Store, ctx),
                             configure: options => options.EmptyMessage("No databases were found for the selected connection."))
                         .AddAsyncProvider<ProjectsUpdateCommand.Settings, long>(
                             "language-options",
                             (settings, ctx) => ProjectCommandProviders.GetLanguageOptionChoicesAsync(
-                                connectionStore,
+                                tigerQuery.Store,
                                 settings,
                                 ctx)),
                     "Update project.");
@@ -140,7 +157,7 @@ internal static class TigerWrapApp
                     sp.AddAsyncProvider<ProjectsSpAddCommand.Settings, string>(
                         "schemas",
                         (settings, ctx) => ProjectCommandProviders.GetSchemaChoicesAsync(
-                            connectionStore,
+                            tigerQuery.Store,
                             settings.ConnectionName,
                             settings.ProjectName,
                             ctx),
@@ -148,25 +165,25 @@ internal static class TigerWrapApp
                     sp.AddAsyncProvider<ProjectsSpAddCommand.Settings, long>(
                         "language-options",
                         (settings, ctx) => ProjectCommandProviders.GetStoredProcedureLanguageOptionChoicesAsync(
-                            connectionStore,
+                            tigerQuery.Store,
                             settings.ConnectionName,
                             settings.ProjectName,
                             ctx));
                     sp.AddAsyncProvider<ProjectsSpRemoveCommand.Settings, int>(
                         "stored-procedure-mappings",
                         (settings, ctx) => ProjectCommandProviders.GetStoredProcedureMappingChoicesAsync(
-                            connectionStore,
+                            tigerQuery.Store,
                             settings.ConnectionName,
                             settings.ProjectName,
                             ctx),
                         configure: options => options.EmptyMessage("No stored procedure mappings were found for the selected project."));
                     sp.AddCommand(
                         "add",
-                        () => new ProjectsSpAddCommand(connectionStore),
+                        () => new ProjectsSpAddCommand(tigerQuery.Store),
                         "Add stored procedure mapping.");
                     sp.AddCommand(
                         "remove",
-                        () => new ProjectsSpRemoveCommand(connectionStore),
+                        () => new ProjectsSpRemoveCommand(tigerQuery.Store),
                         "Remove stored procedure mapping.");
                 });
                 group.AddCommandGroup("enum", enumGroup =>
@@ -175,7 +192,7 @@ internal static class TigerWrapApp
                     enumGroup.AddAsyncProvider<ProjectsEnumAddCommand.Settings, string>(
                         "schemas",
                         (settings, ctx) => ProjectCommandProviders.GetSchemaChoicesAsync(
-                            connectionStore,
+                            tigerQuery.Store,
                             settings.ConnectionName,
                             settings.ProjectName,
                             ctx),
@@ -183,18 +200,18 @@ internal static class TigerWrapApp
                     enumGroup.AddAsyncProvider<ProjectsEnumRemoveCommand.Settings, int>(
                         "enum-mappings",
                         (settings, ctx) => ProjectCommandProviders.GetEnumMappingChoicesAsync(
-                            connectionStore,
+                            tigerQuery.Store,
                             settings.ConnectionName,
                             settings.ProjectName,
                             ctx),
                         configure: options => options.EmptyMessage("No enum mappings were found for the selected project."));
                     enumGroup.AddCommand(
                         "add",
-                        () => new ProjectsEnumAddCommand(connectionStore),
+                        () => new ProjectsEnumAddCommand(tigerQuery.Store),
                         "Add enum mapping.");
                     enumGroup.AddCommand(
                         "remove",
-                        () => new ProjectsEnumRemoveCommand(connectionStore),
+                        () => new ProjectsEnumRemoveCommand(tigerQuery.Store),
                         "Remove enum mapping.");
                 });
                 group.AddCommandGroup("norm", norm =>
@@ -203,18 +220,18 @@ internal static class TigerWrapApp
                     norm.AddAsyncProvider<ProjectsNormRemoveCommand.Settings, int>(
                         "normalizations",
                         (settings, ctx) => ProjectCommandProviders.GetNameNormalizationChoicesAsync(
-                            connectionStore,
+                            tigerQuery.Store,
                             settings.ConnectionName,
                             settings.ProjectName,
                             ctx),
                         configure: options => options.EmptyMessage("No name normalizations were found for the selected project."));
                     norm.AddCommand(
                         "add",
-                        () => new ProjectsNormAddCommand(connectionStore),
+                        () => new ProjectsNormAddCommand(tigerQuery.Store),
                         "Add name normalization.");
                     norm.AddCommand(
                         "remove",
-                        () => new ProjectsNormRemoveCommand(connectionStore),
+                        () => new ProjectsNormRemoveCommand(tigerQuery.Store),
                         "Remove name normalization.");
                 });
             })

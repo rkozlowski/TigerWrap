@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using ItTiger.TigerWrap.Core;
 
 namespace ItTiger.TigerWrap.Tests;
 
@@ -67,9 +68,11 @@ public sealed class ReleasedArtifactTests
     {
         SkipUnlessGitIsAvailable();
 
-        // Every deployment script already committed is by definition shipped, so it must be listed
-        // above. A script for the version currently under development is untracked at HEAD and is
-        // therefore absent from this listing until it is released.
+        // Every committed deployment script is shipped, and therefore listed above, except the
+        // scripts that produce the schema version currently under development
+        // (ExpectedDbInfo.CurrentSchemaVersion). Those may be committed and regenerated until the
+        // version is released; the release adds them to the list, and the next version bump then
+        // makes an unlisted one fail here.
         var listing = Git("ls-tree --name-only HEAD TigerWrapDb/DeploymentScripts/");
         Assert.True(listing.ExitCode == 0, $"git ls-tree failed: {listing.StdErr}");
 
@@ -80,11 +83,37 @@ public sealed class ReleasedArtifactTests
 
         Assert.NotEmpty(tracked);
 
-        var unlisted = tracked.Except(ReleasedArtifacts, StringComparer.Ordinal).ToArray();
+        var unlisted = tracked
+            .Except(ReleasedArtifacts, StringComparer.Ordinal)
+            .Where(path => !ProducesSchemaVersionUnderDevelopment(path))
+            .ToArray();
         Assert.True(
             unlisted.Length == 0,
             "These committed deployment artifacts are not covered by the immutability guard; add them to "
                 + $"{nameof(ReleasedArtifacts)}: {string.Join(", ", unlisted)}");
+    }
+
+    [Theory]
+    [InlineData("TigerWrapDb/DeploymentScripts/TigerWrapDb_FullDeploy_v_" + ExpectedDbInfo.CurrentSchemaVersion + ".sql", true)]
+    [InlineData("TigerWrapDb/DeploymentScripts/TigerWrapDb_Upgrade_v_0.0.1_to_" + ExpectedDbInfo.CurrentSchemaVersion + ".sql", true)]
+    [InlineData("TigerWrapDb/DeploymentScripts/TigerWrapDb_FullDeploy_v_0.9.0.sql", false)]
+    [InlineData("TigerWrapDb/DeploymentScripts/TigerWrapDb_Upgrade_v_" + ExpectedDbInfo.CurrentSchemaVersion + "_to_99.0.0.sql", false)]
+    public void UnderDevelopmentDetection_MatchesOnlyScriptsProducingTheCurrentSchemaVersion(string path, bool expected)
+    {
+        Assert.Equal(expected, ProducesSchemaVersionUnderDevelopment(path));
+    }
+
+    /// <summary>
+    /// True when the script's target version - the full-deploy version, or the "to" version of an
+    /// upgrade - is the schema version currently under development.
+    /// </summary>
+    private static bool ProducesSchemaVersionUnderDevelopment(string repoRelativePath)
+    {
+        var fileName = Path.GetFileNameWithoutExtension(repoRelativePath);
+        var versionPart = fileName.Contains("_to_", StringComparison.Ordinal)
+            ? fileName[(fileName.LastIndexOf("_to_", StringComparison.Ordinal) + "_to_".Length)..]
+            : fileName[(fileName.LastIndexOf("_v_", StringComparison.Ordinal) + "_v_".Length)..];
+        return string.Equals(versionPart, ExpectedDbInfo.CurrentSchemaVersion, StringComparison.Ordinal);
     }
 
     private static void SkipUnlessGitIsAvailable()

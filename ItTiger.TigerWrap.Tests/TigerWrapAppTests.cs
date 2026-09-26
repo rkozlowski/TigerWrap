@@ -20,7 +20,7 @@ public sealed class TigerWrapAppTests
     [Fact]
     public async Task RootHelp_IncludesCommandsIncludingGenerateCode()
     {
-        var app = TigerWrapApp.Build(CreateStore());
+        var app = TestApps.Build(CreateStore());
 
         var result = await TigerCliAppTestHost
             .For(app)
@@ -37,7 +37,7 @@ public sealed class TigerWrapAppTests
     [Fact]
     public async Task RootHelp_IncludesDbCommandGroup()
     {
-        var app = TigerWrapApp.Build(CreateStore());
+        var app = TestApps.Build(CreateStore());
 
         var result = await TigerCliAppTestHost
             .For(app)
@@ -59,9 +59,14 @@ public sealed class TigerWrapAppTests
     [InlineData("db install", "--sql-folder")]
     [InlineData("db upgrade", "--backup-confirmed")]
     [InlineData("db upgrade", "--sql-folder")]
+    [InlineData("db", "sqlcmd")]
+    [InlineData("db sqlcmd", "--file")]
+    [InlineData("db sqlcmd", "SqlCmdEx")]
+    [InlineData("db sqlcmd", "--command-timeout")]
+    [InlineData("db sqlcmd", "--tq-connection-store-file")]
     public async Task DbCommandHelp_IsRegistered(string commandPath, string expectedText)
     {
-        var app = TigerWrapApp.Build(CreateStore());
+        var app = TestApps.Build(CreateStore());
 
         var result = await TigerCliAppTestHost
             .For(app)
@@ -117,7 +122,7 @@ public sealed class TigerWrapAppTests
     [Fact]
     public void DbInstall_IsVisibleInTheCommandMenu()
     {
-        var app = TigerWrapApp.Build(CreateStore());
+        var app = TestApps.Build(CreateStore());
 
         var install = FindCommandRegistration(app, "db", "install");
         var info = FindCommandRegistration(app, "db", "info");
@@ -127,6 +132,25 @@ public sealed class TigerWrapAppTests
         var installMenuMode = GetRegistrationProperty<CommandMenuMode>(install, "CommandMenuMode");
         Assert.NotEqual(CommandMenuMode.Disabled, installMenuMode);
         Assert.Equal(GetRegistrationProperty<CommandMenuMode>(info, "CommandMenuMode"), installMenuMode);
+    }
+
+    [Fact]
+    public void DbSqlCmd_IsExcludedFromTheCommandMenuAndPromptsOnlyForTheConnection()
+    {
+        var app = TestApps.Build(CreateStore());
+        var sqlcmd = FindCommandRegistration(app, "db", "sqlcmd");
+        var connection = GetArgument<DbSqlCmdCommand.Settings>(nameof(DbSqlCmdCommand.Settings.ConnectionName));
+        var file = GetOption<DbSqlCmdCommand.Settings>(nameof(DbSqlCmdCommand.Settings.FilePath));
+        var mode = GetOption<DbSqlCmdCommand.Settings>(nameof(DbSqlCmdCommand.Settings.Mode));
+        var timeout = GetOption<DbSqlCmdCommand.Settings>(nameof(DbSqlCmdCommand.Settings.CommandTimeout));
+
+        Assert.Equal(CommandMenuMode.Disabled, GetRegistrationProperty<CommandMenuMode>(sqlcmd, "CommandMenuMode"));
+        Assert.Equal("connections", connection.Provider);
+        Assert.False(connection.AutoSelectSingleChoice);
+        Assert.True(file.Required);
+        Assert.Equal(TigerCliPromptable.No, file.Promptable);
+        Assert.Equal(TigerCliPromptable.No, mode.Promptable);
+        Assert.Equal(TigerCliPromptable.No, timeout.Promptable);
     }
 
     [Fact]
@@ -162,7 +186,7 @@ public sealed class TigerWrapAppTests
     [InlineData("generate-code", "--output-type")]
     public async Task CommandHelp_IsRegistered(string commandPath, string expectedText)
     {
-        var app = TigerWrapApp.Build(CreateStore());
+        var app = TestApps.Build(CreateStore());
 
         var result = await TigerCliAppTestHost
             .For(app)
@@ -176,7 +200,7 @@ public sealed class TigerWrapAppTests
     [Fact]
     public async Task ProjectsHelp_ListsNestedSubResourceGroups()
     {
-        var app = TigerWrapApp.Build(CreateStore());
+        var app = TestApps.Build(CreateStore());
 
         var result = await TigerCliAppTestHost
             .For(app)
@@ -199,7 +223,7 @@ public sealed class TigerWrapAppTests
     [InlineData("project norm", "Manage project name normalizations")]
     public async Task ProjectSubResourceGroupHelp_ListsAddAndRemoveChildren(string commandPath, string expectedDescription)
     {
-        var app = TigerWrapApp.Build(CreateStore());
+        var app = TestApps.Build(CreateStore());
 
         var result = await TigerCliAppTestHost
             .For(app)
@@ -383,7 +407,7 @@ public sealed class TigerWrapAppTests
     [Fact]
     public void GenerateCode_IsExcludedFromCommandMenuAndNotOptionalCommandPrompting()
     {
-        var app = TigerWrapApp.Build(CreateStore());
+        var app = TestApps.Build(CreateStore());
         var generateCode = FindCommandRegistration(app, "generate-code");
 
         Assert.Equal(CommandMenuMode.Disabled, GetRegistrationProperty<CommandMenuMode>(generateCode, "CommandMenuMode"));
@@ -408,7 +432,7 @@ public sealed class TigerWrapAppTests
     [Fact]
     public async Task GenerateCode_NonInteractiveMissingArguments_UsesExistingMissingArgumentFailure()
     {
-        var app = TigerWrapApp.Build(CreateStore());
+        var app = TestApps.Build(CreateStore());
 
         var result = await TigerCliAppTestHost
             .For(app)
@@ -421,7 +445,7 @@ public sealed class TigerWrapAppTests
     [Fact]
     public async Task UnknownOption_MapsToTigerCliInvalidArguments()
     {
-        var app = TigerWrapApp.Build(CreateStore());
+        var app = TestApps.Build(CreateStore());
 
         var result = await TigerCliAppTestHost
             .For(app)
@@ -434,7 +458,7 @@ public sealed class TigerWrapAppTests
     [Fact]
     public async Task CommandMenuNonInteractive_MapsToTigerCliInteractiveNotAllowed()
     {
-        var app = TigerWrapApp.Build(CreateStore());
+        var app = TestApps.Build(CreateStore());
 
         var result = await TigerCliAppTestHost
             .For(app)
@@ -447,7 +471,7 @@ public sealed class TigerWrapAppTests
     [Fact]
     public async Task ConnectionsHelp_IncludesTigerQueryConnectionCommands()
     {
-        var app = TigerWrapApp.Build(CreateStore());
+        var app = TestApps.Build(CreateStore());
 
         var result = await TigerCliAppTestHost
             .For(app)
@@ -466,7 +490,7 @@ public sealed class TigerWrapAppTests
     public async Task ConnectionsAdd_UsesConfiguredTigerWrapStore()
     {
         var store = CreateStore();
-        var app = TigerWrapApp.Build(store);
+        var app = TestApps.Build(store);
 
         var result = await TigerCliAppTestHost
             .For(app)
@@ -497,7 +521,7 @@ public sealed class TigerWrapAppTests
     public async Task ConnectionsAdd_RequiresDatabase()
     {
         var store = CreateStore();
-        var app = TigerWrapApp.Build(store);
+        var app = TestApps.Build(store);
 
         var result = await TigerCliAppTestHost
             .For(app)
